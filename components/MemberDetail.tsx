@@ -60,7 +60,7 @@ export default function MemberDetail({
             <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.report_role}</p>
           </div>
           <select
-            className="focus-ring rounded-md border border-[var(--line)] p-2 text-sm"
+            className="focus-ring min-h-11 rounded-md border border-[var(--line)] p-2 text-sm"
             defaultValue={cycle.status}
             onChange={(event) => updateCycle({ status: event.target.value })}
           >
@@ -78,7 +78,7 @@ export default function MemberDetail({
             {checklistItems.map(([field, label]) => {
               const dateField = `${field}_date` as keyof DashboardCycle;
               return (
-                <label key={field} className="flex items-start gap-3 rounded-md border border-[var(--line)] p-3">
+                <label key={field} className="flex min-h-11 items-start gap-3 rounded-md border border-[var(--line)] p-3">
                   <input
                     className="mt-1"
                     checked={Boolean(cycle[field])}
@@ -128,7 +128,7 @@ export default function MemberDetail({
                 <label key={slot} className="text-sm">
                   Slot {slot}
                   <select
-                    className="focus-ring mt-1 w-full rounded-md border border-[var(--line)] p-2"
+                    className="focus-ring mt-1 min-h-11 w-full rounded-md border border-[var(--line)] p-2"
                     defaultValue={selected?.assignee_member_id ?? ""}
                     onChange={(event) =>
                       updateCycle({

@@ -12,7 +12,7 @@ export default function MemberCard({ cycle }: { cycle: DashboardCycle }) {
   return (
     <Link
       href={`/members/${cycle.member.id}`}
-      className="block rounded-md border border-[var(--line)] bg-white p-3 hover:border-[var(--accent)]"
+      className="focus-ring block min-h-11 rounded-md border border-[var(--line)] bg-white p-3 hover:border-[var(--accent)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div>

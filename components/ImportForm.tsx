@@ -53,7 +53,7 @@ export default function ImportForm() {
         />
       </label>
       <button
-        className="focus-ring rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] disabled:opacity-60"
+        className="focus-ring min-h-11 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] disabled:opacity-60"
         disabled={isSubmitting}
         type="submit"
       >

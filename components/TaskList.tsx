@@ -30,7 +30,7 @@ export default function TaskList({ tasks }: { tasks: RenewalTask[] }) {
                   <p className="text-sm text-[var(--muted)]">Due {task.due_date}</p>
                 </div>
                 <select
-                  className="focus-ring rounded-md border border-[var(--line)] p-2 text-sm"
+                  className="focus-ring min-h-11 rounded-md border border-[var(--line)] p-2 text-sm"
                   defaultValue={task.status}
                   onChange={(event) => updateTask(task.id, event.target.value as RenewalTask["status"])}
                 >
