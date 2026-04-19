@@ -29,7 +29,7 @@ export function getUrgency(dueDate: string, today = new Date()): Urgency {
     };
   }
 
-  if (daysUntilDue <= 3) {
+  if (daysUntilDue <= 5) {
     return {
       urgency_score: 70,
       urgency_label: "due_soon",

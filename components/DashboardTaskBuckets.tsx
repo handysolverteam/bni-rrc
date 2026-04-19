@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatDisplayDate } from "@/lib/date-format";
 import { getDashboardTaskBuckets, type DashboardTaskBucketKey } from "@/lib/renewals/task-buckets";
 import { taskTypeLabels } from "@/lib/renewals/task-types";
 import type { DashboardCycle } from "@/lib/types";
@@ -58,11 +59,11 @@ export default function DashboardTaskBuckets({ cycles }: { cycles: DashboardCycl
                     <dl className="mt-3 space-y-1 text-sm">
                       <div className="flex justify-between gap-3">
                         <dt className="text-[var(--muted)]">Due</dt>
-                        <dd>{task.due_date}</dd>
+                        <dd>{formatDisplayDate(task.due_date)}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
                         <dt className="text-[var(--muted)]">Renewal</dt>
-                        <dd>{task.renewal_date}</dd>
+                        <dd>{formatDisplayDate(task.renewal_date)}</dd>
                       </div>
                     </dl>
                   </Link>

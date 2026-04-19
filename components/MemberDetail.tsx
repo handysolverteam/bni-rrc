@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { formatDisplayDate } from "@/lib/date-format";
 import type { DashboardCycle, Member } from "@/lib/types";
 import TaskList from "./TaskList";
 
@@ -52,7 +53,7 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
                 Renewal date
               </p>
               <p className="mt-1 text-3xl font-semibold tracking-normal text-[var(--accent)]">
-                {cycle.renewal_date}
+                {formatDisplayDate(cycle.renewal_date)}
               </p>
             </div>
           </div>
@@ -75,7 +76,7 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
             {Object.entries(cycle.derived_dates).map(([label, value]) => (
               <div key={label} className="flex justify-between gap-4">
                 <dt className="text-[var(--muted)]">{label.replaceAll("_", " ")}</dt>
-                <dd>{value}</dd>
+                <dd>{formatDisplayDate(value)}</dd>
               </div>
             ))}
           </dl>
@@ -99,7 +100,7 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
               {detail.cycles.map((item) => (
                 <tr key={item.id} className="border-b border-[var(--line)] last:border-0">
                   <td className="py-2 pr-3">{item.renewal_year}</td>
-                  <td className="py-2 pr-3">{item.renewal_date}</td>
+                  <td className="py-2 pr-3">{formatDisplayDate(item.renewal_date)}</td>
                   <td className="py-2 pr-3">{item.status}</td>
                   <td className="py-2 pr-3">{item.stage ?? "Not in active workflow"}</td>
                 </tr>

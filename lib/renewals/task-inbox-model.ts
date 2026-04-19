@@ -11,6 +11,18 @@ export type TaskInboxItem = TaskInboxCandidate & Urgency;
 
 export type TaskInboxGroups = Record<UrgencyLabel, TaskInboxItem[]>;
 
+export function getNextWorkflowTask<T extends Pick<RenewalTask, "task_type" | "status">>(
+  tasks: T[],
+): T | null {
+  return (
+    activeRenewalTaskTypes
+      .map((taskType) =>
+        tasks.find((task) => task.task_type === taskType && task.status === "open"),
+      )
+      .find((task): task is T => Boolean(task)) ?? null
+  );
+}
+
 export function groupInboxTasks(tasks: TaskInboxItem[]): TaskInboxGroups {
   return {
     overdue: tasks.filter((task) => task.urgency_label === "overdue"),
@@ -43,13 +55,7 @@ export function getNextInboxTasksByMember<T extends TaskInboxCandidate>(tasks: T
     const currentCycleTasks = memberTasks.filter(
       (task) => task.renewal_date === earliestRenewalDate,
     );
-    const nextTask = activeRenewalTaskTypes
-      .map((taskType) =>
-        currentCycleTasks.find(
-          (task) => task.task_type === taskType && task.status === "open",
-        ),
-      )
-      .find((task): task is T => Boolean(task));
+    const nextTask = getNextWorkflowTask(currentCycleTasks);
 
     return nextTask ? [nextTask] : [];
   });

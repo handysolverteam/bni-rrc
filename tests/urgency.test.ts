@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getNextInboxTasksByMember,
+  getNextWorkflowTask,
   sortInboxTasks,
   type TaskInboxItem,
 } from "../lib/renewals/task-inbox-model";
@@ -67,16 +68,16 @@ describe("renewal task urgency", () => {
     });
   });
 
-  it("marks dates through the next three days as due soon", () => {
-    expect(getUrgency("2026-04-22", today)).toEqual({
+  it("marks dates through the next five days as due soon", () => {
+    expect(getUrgency("2026-04-24", today)).toEqual({
       urgency_score: 70,
       urgency_label: "due_soon",
       color: "yellow",
     });
   });
 
-  it("marks dates more than three days away as upcoming", () => {
-    expect(getUrgency("2026-04-23", today)).toEqual({
+  it("marks dates more than five days away as upcoming", () => {
+    expect(getUrgency("2026-04-25", today)).toEqual({
       urgency_score: 30,
       urgency_label: "upcoming",
       color: "green",
@@ -107,6 +108,45 @@ describe("renewal task urgency", () => {
     ]);
 
     expect(selected.map((task) => task.id)).toEqual(["mc"]);
+  });
+
+  it("chooses the first open workflow task for one cycle", () => {
+    const nextTask = getNextWorkflowTask([
+      openTask("payment", "payment_due"),
+      openTask("member", "member_discussion"),
+      openTask("mc", "mc_discussion"),
+    ]);
+
+    expect(nextTask?.id).toBe("mc");
+  });
+
+  it("chooses member discussion when mc discussion is not open", () => {
+    const nextTask = getNextWorkflowTask([
+      openTask("mc", "mc_discussion", "member-1", "2026-07-01", "completed"),
+      openTask("member", "member_discussion"),
+      openTask("docs", "docs_collection"),
+    ]);
+
+    expect(nextTask?.id).toBe("member");
+  });
+
+  it("ignores completed and cancelled workflow tasks", () => {
+    const nextTask = getNextWorkflowTask([
+      openTask("mc", "mc_discussion", "member-1", "2026-07-01", "completed"),
+      openTask("member", "member_discussion", "member-1", "2026-07-01", "cancelled"),
+      openTask("docs", "docs_collection"),
+    ]);
+
+    expect(nextTask?.id).toBe("docs");
+  });
+
+  it("returns null when no workflow task is open", () => {
+    const nextTask = getNextWorkflowTask([
+      openTask("mc", "mc_discussion", "member-1", "2026-07-01", "completed"),
+      openTask("member", "member_discussion", "member-1", "2026-07-01", "cancelled"),
+    ]);
+
+    expect(nextTask).toBeNull();
   });
 
   it("keeps one next task for each member", () => {

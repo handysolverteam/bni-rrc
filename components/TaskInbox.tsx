@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { formatDisplayDate } from "@/lib/date-format";
 import { taskTypeLabels } from "@/lib/renewals/task-types";
 import { groupInboxTasks, type TaskInboxItem } from "@/lib/renewals/task-inbox-model";
 import type { RenewalTask } from "@/lib/types";
 
 const sectionLabels = {
   overdue: "🔴 Overdue",
-  due_soon: "🟡 Due Soon (Next 3 Days)",
+  due_soon: "🟡 Due Soon (Next 5 Days)",
   upcoming: "🟢 Upcoming",
 };
 
@@ -64,7 +65,9 @@ export default function TaskInbox({ tasks }: { tasks: TaskInboxItem[] }) {
             <span className="block text-xl font-semibold tracking-normal">
               {nextAction.member.name} - {taskTypeLabels[nextAction.task_type]}
             </span>
-            <span className="mt-1 block text-sm text-[var(--muted)]">Due {nextAction.due_date}</span>
+            <span className="mt-1 block text-sm text-[var(--muted)]">
+              Due {formatDisplayDate(nextAction.due_date)}
+            </span>
           </button>
         ) : (
           <p className="mt-1 text-sm text-[var(--muted)]">No open tasks.</p>
@@ -117,7 +120,9 @@ export default function TaskInbox({ tasks }: { tasks: TaskInboxItem[] }) {
                           <p className="text-sm font-medium text-[var(--accent)]">
                             {taskTypeLabels[task.task_type]}
                           </p>
-                          <p className="mt-1 text-sm text-[var(--muted)]">Due {task.due_date}</p>
+                          <p className="mt-1 text-sm text-[var(--muted)]">
+                            Due {formatDisplayDate(task.due_date)}
+                          </p>
                         </div>
                       </div>
 

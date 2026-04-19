@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { formatDisplayDate } from "@/lib/date-format";
 import { isActiveRenewalTaskType, taskTypeLabels } from "@/lib/renewals/task-types";
 import type { RenewalTask } from "@/lib/types";
 
@@ -29,7 +30,7 @@ export default function TaskList({ tasks }: { tasks: RenewalTask[] }) {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium">{taskTypeLabels[task.task_type]}</p>
-                  <p className="text-sm text-[var(--muted)]">Due {task.due_date}</p>
+                  <p className="text-sm text-[var(--muted)]">Due {formatDisplayDate(task.due_date)}</p>
                 </div>
                 <select
                   className="focus-ring min-h-11 rounded-md border border-[var(--line)] p-2 text-sm"
