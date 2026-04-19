@@ -1,7 +1,6 @@
 import Link from "next/link";
 import MemberDetail from "@/components/MemberDetail";
-import { getCommitteeMembers, getMemberDetail } from "@/lib/renewals/data";
-import type { Member } from "@/lib/types";
+import { getMemberDetail } from "@/lib/renewals/data";
 
 export const dynamic = "force-dynamic";
 
@@ -12,16 +11,10 @@ export default async function MemberPage({
 }) {
   const { id } = await params;
   let detail: Awaited<ReturnType<typeof getMemberDetail>> | null = null;
-  let committeeMembers: Member[] = [];
   let error: string | null = null;
 
   try {
-    const [memberDetail, committee] = await Promise.all([
-      getMemberDetail(id),
-      getCommitteeMembers(),
-    ]);
-    detail = memberDetail;
-    committeeMembers = committee;
+    detail = await getMemberDetail(id);
   } catch (caught) {
     error = caught instanceof Error ? caught.message : "Unable to load member";
   }
@@ -37,7 +30,7 @@ export default async function MemberPage({
           <p className="mt-2 text-sm text-[var(--muted)]">{error}</p>
         </div>
       ) : (
-        <MemberDetail detail={detail} committeeMembers={committeeMembers} />
+        <MemberDetail detail={detail} />
       )}
     </div>
   );

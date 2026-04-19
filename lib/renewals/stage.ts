@@ -22,11 +22,10 @@ export function getDerivedRenewalDates(renewalDate: string): DerivedRenewalDates
   );
 
   return {
-    mc_discussion_date: toDateOnly(addDays(renewal, -120)),
-    member_discussion_date: toDateOnly(addDays(renewal, -90)),
-    monthly_review_date: toDateOnly(addDays(renewal, -60)),
-    renewal_push_date: toDateOnly(addDays(renewal, -45)),
-    docs_deadline: toDateOnly(addDays(renewal, -30)),
+    mc_discussion_date: toDateOnly(addDays(renewal, -90)),
+    member_discussion_date: toDateOnly(addDays(renewal, -60)),
+    documents_sent_date: toDateOnly(addDays(renewal, -45)),
+    payment_due_date: toDateOnly(addDays(renewal, -30)),
     final_deadline: toDateOnly(finalDeadline),
   };
 }
@@ -34,7 +33,7 @@ export function getDerivedRenewalDates(renewalDate: string): DerivedRenewalDates
 export function calculateStage(
   renewalCycle: Pick<RenewalCycle, "renewal_date" | "status">,
   today = new Date(),
-): RenewalStage {
+): RenewalStage | null {
   if (renewalCycle.status === "renewed") {
     return "Renewed";
   }
@@ -51,32 +50,27 @@ export function calculateStage(
   if (todayOnly >= derived.final_deadline) {
     return "Critical Deadline";
   }
-  if (todayOnly >= derived.docs_deadline) {
-    return "Docs Pending";
+  if (todayOnly >= derived.payment_due_date) {
+    return "Payment Pending";
   }
-  if (todayOnly >= derived.renewal_push_date) {
-    return "Renewal Due";
-  }
-  if (todayOnly >= derived.monthly_review_date) {
-    return "Monthly Review";
+  if (todayOnly >= derived.documents_sent_date) {
+    return "Documents Pending";
   }
   if (todayOnly >= derived.member_discussion_date) {
     return "Member Discussion";
   }
   if (todayOnly >= derived.mc_discussion_date) {
-    return "MC Discussion Due";
+    return "MC Discussion";
   }
 
-  return "Upcoming";
+  return null;
 }
 
 export const renewalStages: RenewalStage[] = [
-  "Upcoming",
-  "MC Discussion Due",
+  "MC Discussion",
   "Member Discussion",
-  "Monthly Review",
-  "Renewal Due",
-  "Docs Pending",
+  "Documents Pending",
+  "Payment Pending",
   "Critical Deadline",
   "Renewed",
   "Dropped",

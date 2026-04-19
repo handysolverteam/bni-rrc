@@ -1,12 +1,10 @@
 export type RenewalStatus = "active" | "renewed" | "dropped";
 
 export type RenewalStage =
-  | "Upcoming"
-  | "MC Discussion Due"
+  | "MC Discussion"
   | "Member Discussion"
-  | "Monthly Review"
-  | "Renewal Due"
-  | "Docs Pending"
+  | "Documents Pending"
+  | "Payment Pending"
   | "Critical Deadline"
   | "Renewed"
   | "Dropped";
@@ -17,6 +15,7 @@ export type RenewalTaskType =
   | "monthly_review"
   | "renewal_push"
   | "docs_collection"
+  | "payment_due"
   | "critical_deadline";
 
 export type Member = {
@@ -70,15 +69,14 @@ export type RenewalAssignment = {
 export type DerivedRenewalDates = {
   mc_discussion_date: string;
   member_discussion_date: string;
-  monthly_review_date: string;
-  renewal_push_date: string;
-  docs_deadline: string;
+  documents_sent_date: string;
+  payment_due_date: string;
   final_deadline: string;
 };
 
 export type DashboardCycle = RenewalCycle & {
   member: Member;
-  stage: RenewalStage;
+  stage: RenewalStage | null;
   derived_dates: DerivedRenewalDates;
   assignments: RenewalAssignment[];
   renewal_tasks: RenewalTask[];

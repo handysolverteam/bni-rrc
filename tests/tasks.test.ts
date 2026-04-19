@@ -24,15 +24,31 @@ const cycle: RenewalCycle = {
 };
 
 describe("renewal tasks", () => {
-  it("returns trigger tasks due on or before today", () => {
-    const triggers = getDueTaskTriggers(cycle, new Date("2026-05-17T00:00:00.000Z"));
+  it("returns active trigger tasks due through the end of next week", () => {
+    const triggers = getDueTaskTriggers(cycle, new Date("2026-04-14T00:00:00.000Z"));
 
     expect(triggers.map((trigger) => trigger.type)).toEqual([
       "mc_discussion",
-      "member_discussion",
-      "monthly_review",
-      "renewal_push",
     ]);
+  });
+
+  it("generates the four operational renewal tasks", () => {
+    const triggers = getDueTaskTriggers(cycle, new Date("2026-06-09T00:00:00.000Z"));
+
+    expect(triggers).toEqual([
+      { type: "mc_discussion", dueDate: "2026-04-02" },
+      { type: "member_discussion", dueDate: "2026-05-02" },
+      { type: "docs_collection", dueDate: "2026-05-17" },
+      { type: "payment_due", dueDate: "2026-06-01" },
+    ]);
+  });
+
+  it("does not generate legacy or critical deadline tasks", () => {
+    const triggers = getDueTaskTriggers(cycle, new Date("2026-06-09T00:00:00.000Z"));
+
+    expect(triggers.map((trigger) => trigger.type)).not.toContain("monthly_review");
+    expect(triggers.map((trigger) => trigger.type)).not.toContain("renewal_push");
+    expect(triggers.map((trigger) => trigger.type)).not.toContain("critical_deadline");
   });
 
   it("does not generate triggers for completed renewal cycles", () => {

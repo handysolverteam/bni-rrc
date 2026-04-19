@@ -10,20 +10,7 @@ type MemberDetailPayload = {
   cycles: DashboardCycle[];
 };
 
-const checklistItems = [
-  ["online_form_filled", "Online form filled"],
-  ["checklist_filled", "Checklist filled"],
-  ["payment_link_generated", "Payment link generated"],
-  ["payment_made", "Payment made"],
-] as const;
-
-export default function MemberDetail({
-  detail,
-  committeeMembers,
-}: {
-  detail: MemberDetailPayload;
-  committeeMembers: Member[];
-}) {
+export default function MemberDetail({ detail }: { detail: MemberDetailPayload }) {
   const router = useRouter();
   const cycle = detail.currentCycle;
 
@@ -54,10 +41,20 @@ export default function MemberDetail({
       <section className="rounded-md border border-[var(--line)] bg-white p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-[var(--accent)]">{cycle.stage}</p>
+            <p className="text-sm font-medium text-[var(--accent)]">
+              {cycle.stage ?? "Not in active workflow"}
+            </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-normal">{detail.member.name}</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.industry}</p>
             <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.report_role}</p>
+            <div className="mt-4 rounded-md bg-[#eef1ea] px-4 py-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                Renewal date
+              </p>
+              <p className="mt-1 text-3xl font-semibold tracking-normal text-[var(--accent)]">
+                {cycle.renewal_date}
+              </p>
+            </div>
           </div>
           <select
             className="focus-ring min-h-11 rounded-md border border-[var(--line)] p-2 text-sm"
@@ -68,90 +65,6 @@ export default function MemberDetail({
             <option value="renewed">Renewed</option>
             <option value="dropped">Dropped</option>
           </select>
-        </div>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-md border border-[var(--line)] bg-white p-4">
-          <h2 className="text-xl font-semibold tracking-normal">Checklist</h2>
-          <div className="mt-4 space-y-3">
-            {checklistItems.map(([field, label]) => {
-              const dateField = `${field}_date` as keyof DashboardCycle;
-              return (
-                <label key={field} className="flex min-h-11 items-start gap-3 rounded-md border border-[var(--line)] p-3">
-                  <input
-                    className="mt-1"
-                    checked={Boolean(cycle[field])}
-                    type="checkbox"
-                    onChange={(event) => updateCycle({ [field]: event.target.checked })}
-                  />
-                  <span>
-                    <span className="block font-medium">{label}</span>
-                    <span className="text-sm text-[var(--muted)]">
-                      {cycle[dateField] ? `Completed ${cycle[dateField]}` : "Pending"}
-                    </span>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-md border border-[var(--line)] bg-white p-4">
-          <h2 className="text-xl font-semibold tracking-normal">Follow-up</h2>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">
-              Last follow-up
-              <input
-                className="focus-ring mt-1 w-full rounded-md border border-[var(--line)] p-2"
-                defaultValue={cycle.last_followup_date ?? ""}
-                type="date"
-                onBlur={(event) => updateCycle({ last_followup_date: event.target.value || null })}
-              />
-            </label>
-            <label className="text-sm">
-              Next follow-up
-              <input
-                className="focus-ring mt-1 w-full rounded-md border border-[var(--line)] p-2"
-                defaultValue={cycle.next_followup_date ?? ""}
-                type="date"
-                onBlur={(event) => updateCycle({ next_followup_date: event.target.value || null })}
-              />
-            </label>
-          </div>
-
-          <h3 className="mt-5 font-semibold">Committee assignees</h3>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            {[1, 2].map((slot) => {
-              const selected = cycle.assignments.find((assignment) => assignment.slot === slot);
-              return (
-                <label key={slot} className="text-sm">
-                  Slot {slot}
-                  <select
-                    className="focus-ring mt-1 min-h-11 w-full rounded-md border border-[var(--line)] p-2"
-                    defaultValue={selected?.assignee_member_id ?? ""}
-                    onChange={(event) =>
-                      updateCycle({
-                        assignments: [
-                          {
-                            slot,
-                            assignee_member_id: event.target.value || null,
-                          },
-                        ],
-                      })
-                    }
-                  >
-                    <option value="">Unassigned</option>
-                    {committeeMembers.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              );
-            })}
-          </div>
         </div>
       </section>
 
@@ -188,7 +101,7 @@ export default function MemberDetail({
                   <td className="py-2 pr-3">{item.renewal_year}</td>
                   <td className="py-2 pr-3">{item.renewal_date}</td>
                   <td className="py-2 pr-3">{item.status}</td>
-                  <td className="py-2 pr-3">{item.stage}</td>
+                  <td className="py-2 pr-3">{item.stage ?? "Not in active workflow"}</td>
                 </tr>
               ))}
             </tbody>

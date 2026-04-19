@@ -14,5 +14,5 @@ export function groupCyclesByStage(cycles: DashboardCycle[]): StageGroup[] {
 }
 
 export function getDefaultMobileStage(cycles: DashboardCycle[]): RenewalStage {
-  return groupCyclesByStage(cycles).find((group) => group.cycles.length > 0)?.stage ?? "Upcoming";
+  return groupCyclesByStage(cycles).find((group) => group.cycles.length > 0)?.stage ?? "MC Discussion";
 }

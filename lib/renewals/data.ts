@@ -7,6 +7,7 @@ import type {
   RenewalTask,
 } from "../types";
 import { calculateStage, getDerivedRenewalDates } from "./stage";
+import { isActiveRenewalTaskType } from "./task-types";
 
 type RenewalCycleRow = RenewalCycle & {
   members: Member | null;
@@ -28,7 +29,9 @@ export function enrichCycle(row: RenewalCycleRow, today = new Date()): Dashboard
       ...assignment,
       assignee: assignment.members ?? undefined,
     })),
-    open_task_count: row.renewal_tasks.filter((task) => task.status === "open").length,
+    open_task_count: row.renewal_tasks.filter(
+      (task) => task.status === "open" && isActiveRenewalTaskType(task.task_type),
+    ).length,
   };
 }
 

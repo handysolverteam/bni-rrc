@@ -8,10 +8,26 @@ type Trigger = {
   dueDate: string;
 };
 
-function todayDateOnly(today: Date): string {
-  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()))
-    .toISOString()
-    .slice(0, 10);
+function toDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfUtcWeek(date: Date): Date {
+  const day = date.getUTCDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const weekStart = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  weekStart.setUTCDate(weekStart.getUTCDate() + mondayOffset);
+  return weekStart;
+}
+
+function addDays(date: Date, days: number): Date {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function endOfNextWeekDateOnly(today: Date): string {
+  return toDateOnly(addDays(startOfUtcWeek(today), 13));
 }
 
 export function getDueTaskTriggers(cycle: RenewalCycle, today = new Date()): Trigger[] {
@@ -19,18 +35,16 @@ export function getDueTaskTriggers(cycle: RenewalCycle, today = new Date()): Tri
     return [];
   }
 
-  const currentDate = todayDateOnly(today);
+  const horizonDate = endOfNextWeekDateOnly(today);
   const derived = getDerivedRenewalDates(cycle.renewal_date);
   const triggers: Trigger[] = [
     { type: "mc_discussion", dueDate: derived.mc_discussion_date },
     { type: "member_discussion", dueDate: derived.member_discussion_date },
-    { type: "monthly_review", dueDate: derived.monthly_review_date },
-    { type: "renewal_push", dueDate: derived.renewal_push_date },
-    { type: "docs_collection", dueDate: derived.docs_deadline },
-    { type: "critical_deadline", dueDate: derived.final_deadline },
+    { type: "docs_collection", dueDate: derived.documents_sent_date },
+    { type: "payment_due", dueDate: derived.payment_due_date },
   ];
 
-  return triggers.filter((trigger) => currentDate >= trigger.dueDate);
+  return triggers.filter((trigger) => horizonDate >= trigger.dueDate);
 }
 
 export async function generateRenewalTasks(today = new Date()) {

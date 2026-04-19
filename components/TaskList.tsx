@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { isActiveRenewalTaskType, taskTypeLabels } from "@/lib/renewals/task-types";
 import type { RenewalTask } from "@/lib/types";
 
 export default function TaskList({ tasks }: { tasks: RenewalTask[] }) {
   const router = useRouter();
+  const activeTasks = tasks.filter((task) => isActiveRenewalTaskType(task.task_type));
 
   async function updateTask(id: string, status: RenewalTask["status"]) {
     await fetch(`/api/tasks/${id}`, {
@@ -19,14 +21,14 @@ export default function TaskList({ tasks }: { tasks: RenewalTask[] }) {
     <div className="rounded-md border border-[var(--line)] bg-white p-4">
       <h2 className="text-xl font-semibold tracking-normal">Tasks</h2>
       <div className="mt-4 space-y-3">
-        {tasks.length === 0 ? (
+        {activeTasks.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">No follow-up tasks yet.</p>
         ) : (
-          tasks.map((task) => (
+          activeTasks.map((task) => (
             <div key={task.id} className="rounded-md border border-[var(--line)] p-3">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="font-medium">{task.task_type.replaceAll("_", " ")}</p>
+                  <p className="font-medium">{taskTypeLabels[task.task_type]}</p>
                   <p className="text-sm text-[var(--muted)]">Due {task.due_date}</p>
                 </div>
                 <select

@@ -17,16 +17,25 @@ describe("calculateStage", () => {
   });
 
   it("covers every date-driven pipeline stage", () => {
-    expect(calculateStage(baseCycle, utc("2026-02-28"))).toBe("Upcoming");
-    expect(calculateStage(baseCycle, utc("2026-03-03"))).toBe("MC Discussion Due");
-    expect(calculateStage(baseCycle, utc("2026-04-02"))).toBe("Member Discussion");
-    expect(calculateStage(baseCycle, utc("2026-05-02"))).toBe("Monthly Review");
-    expect(calculateStage(baseCycle, utc("2026-05-17"))).toBe("Renewal Due");
-    expect(calculateStage(baseCycle, utc("2026-06-01"))).toBe("Docs Pending");
+    expect(calculateStage(baseCycle, utc("2026-03-31"))).toBeNull();
+    expect(calculateStage(baseCycle, utc("2026-04-02"))).toBe("MC Discussion");
+    expect(calculateStage(baseCycle, utc("2026-05-02"))).toBe("Member Discussion");
+    expect(calculateStage(baseCycle, utc("2026-05-17"))).toBe("Documents Pending");
+    expect(calculateStage(baseCycle, utc("2026-06-01"))).toBe("Payment Pending");
     expect(calculateStage(baseCycle, utc("2026-06-15"))).toBe("Critical Deadline");
   });
 
   it("calculates final deadline across year boundaries", () => {
     expect(getDerivedRenewalDates("2027-01-01").final_deadline).toBe("2026-12-15");
+  });
+
+  it("calculates active workflow dates", () => {
+    expect(getDerivedRenewalDates("2026-06-01")).toMatchObject({
+      mc_discussion_date: "2026-03-03",
+      member_discussion_date: "2026-04-02",
+      documents_sent_date: "2026-04-17",
+      payment_due_date: "2026-05-02",
+      final_deadline: "2026-05-15",
+    });
   });
 });
