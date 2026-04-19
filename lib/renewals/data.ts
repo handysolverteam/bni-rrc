@@ -23,7 +23,14 @@ export function enrichCycle(row: RenewalCycleRow, today = new Date()): Dashboard
   return {
     ...row,
     member: row.members!,
-    stage: calculateStage(row, today),
+    stage: calculateStage(
+      {
+        renewal_date: row.renewal_date,
+        status: row.status,
+        renewal_tasks: row.renewal_tasks,
+      },
+      today,
+    ),
     derived_dates: getDerivedRenewalDates(row.renewal_date),
     assignments: row.renewal_assignments.map((assignment) => ({
       ...assignment,

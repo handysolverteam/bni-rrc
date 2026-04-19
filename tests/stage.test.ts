@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateStage, getDerivedRenewalDates } from "../lib/renewals/stage";
+import type { RenewalTask, RenewalTaskType } from "../lib/types";
 
 const baseCycle = {
   renewal_date: "2026-07-01",
@@ -10,19 +11,89 @@ function utc(date: string) {
   return new Date(`${date}T00:00:00.000Z`);
 }
 
+function task(
+  taskType: RenewalTaskType,
+  status: RenewalTask["status"] = "completed",
+): RenewalTask {
+  return {
+    id: taskType,
+    renewal_cycle_id: "cycle-1",
+    task_type: taskType,
+    due_date: "2026-04-01",
+    status,
+    notes: null,
+    completed_at: status === "completed" ? "2026-04-01T00:00:00.000Z" : null,
+  };
+}
+
 describe("calculateStage", () => {
   it("returns status stages first", () => {
     expect(calculateStage({ ...baseCycle, status: "renewed" }, utc("2025-01-01"))).toBe("Renewed");
     expect(calculateStage({ ...baseCycle, status: "dropped" }, utc("2025-01-01"))).toBe("Dropped");
   });
 
-  it("covers every date-driven pipeline stage", () => {
-    expect(calculateStage(baseCycle, utc("2026-03-31"))).toBeNull();
-    expect(calculateStage(baseCycle, utc("2026-04-02"))).toBe("MC Discussion");
-    expect(calculateStage(baseCycle, utc("2026-05-02"))).toBe("Member Discussion");
-    expect(calculateStage(baseCycle, utc("2026-05-17"))).toBe("Documents Pending");
-    expect(calculateStage(baseCycle, utc("2026-06-01"))).toBe("Payment Pending");
-    expect(calculateStage(baseCycle, utc("2026-06-15"))).toBe("Critical Deadline");
+  it("uses the first incomplete required task as the active stage", () => {
+    expect(calculateStage({ ...baseCycle, renewal_tasks: [] }, utc("2026-03-31"))).toBe("MC Discussion");
+    expect(
+      calculateStage({ ...baseCycle, renewal_tasks: [task("mc_discussion")] }, utc("2026-03-31")),
+    ).toBe("Member Discussion");
+    expect(
+      calculateStage(
+        {
+          ...baseCycle,
+          renewal_tasks: [task("mc_discussion"), task("member_discussion")],
+        },
+        utc("2026-03-31"),
+      ),
+    ).toBe("Documents Pending");
+    expect(
+      calculateStage(
+        {
+          ...baseCycle,
+          renewal_tasks: [
+            task("mc_discussion"),
+            task("member_discussion"),
+            task("docs_collection"),
+          ],
+        },
+        utc("2026-03-31"),
+      ),
+    ).toBe("Payment Pending");
+  });
+
+  it("keeps active cycles in payment pending when all required tasks are complete", () => {
+    expect(
+      calculateStage(
+        {
+          ...baseCycle,
+          renewal_tasks: [
+            task("mc_discussion"),
+            task("member_discussion"),
+            task("docs_collection"),
+            task("payment_due"),
+          ],
+        },
+        utc("2026-03-31"),
+      ),
+    ).toBe("Payment Pending");
+  });
+
+  it("does not advance stages for cancelled required tasks", () => {
+    expect(
+      calculateStage(
+        {
+          ...baseCycle,
+          renewal_tasks: [task("mc_discussion"), task("member_discussion", "cancelled")],
+        },
+        utc("2026-03-31"),
+      ),
+    ).toBe("Member Discussion");
+  });
+
+  it("keeps critical deadline as an active-cycle deadline override", () => {
+    expect(calculateStage({ ...baseCycle, renewal_tasks: [] }, utc("2026-06-15"))).toBe(
+      "Critical Deadline",
+    );
   });
 
   it("calculates final deadline across year boundaries", () => {

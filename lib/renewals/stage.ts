@@ -1,4 +1,4 @@
-import type { DerivedRenewalDates, RenewalCycle, RenewalStage } from "../types";
+import type { DerivedRenewalDates, RenewalCycle, RenewalStage, RenewalTask } from "../types";
 
 function parseDateOnly(date: string): Date {
   const [year, month, day] = date.slice(0, 10).split("-").map(Number);
@@ -31,7 +31,9 @@ export function getDerivedRenewalDates(renewalDate: string): DerivedRenewalDates
 }
 
 export function calculateStage(
-  renewalCycle: Pick<RenewalCycle, "renewal_date" | "status">,
+  renewalCycle: Pick<RenewalCycle, "renewal_date" | "status"> & {
+    renewal_tasks?: Pick<RenewalTask, "task_type" | "status">[];
+  },
   today = new Date(),
 ): RenewalStage | null {
   if (renewalCycle.status === "renewed") {
@@ -50,20 +52,29 @@ export function calculateStage(
   if (todayOnly >= derived.final_deadline) {
     return "Critical Deadline";
   }
-  if (todayOnly >= derived.payment_due_date) {
-    return "Payment Pending";
-  }
-  if (todayOnly >= derived.documents_sent_date) {
-    return "Documents Pending";
-  }
-  if (todayOnly >= derived.member_discussion_date) {
-    return "Member Discussion";
-  }
-  if (todayOnly >= derived.mc_discussion_date) {
+
+  const tasks = renewalCycle.renewal_tasks ?? [];
+
+  if (!isTaskCompleted(tasks, "mc_discussion")) {
     return "MC Discussion";
   }
 
-  return null;
+  if (!isTaskCompleted(tasks, "member_discussion")) {
+    return "Member Discussion";
+  }
+
+  if (!isTaskCompleted(tasks, "docs_collection")) {
+    return "Documents Pending";
+  }
+
+  return "Payment Pending";
+}
+
+function isTaskCompleted(
+  tasks: Pick<RenewalTask, "task_type" | "status">[],
+  taskType: RenewalTask["task_type"],
+): boolean {
+  return tasks.some((task) => task.task_type === taskType && task.status === "completed");
 }
 
 export const renewalStages: RenewalStage[] = [
