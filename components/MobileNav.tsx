@@ -12,9 +12,9 @@ export default function MobileNav() {
         </Link>
         <Link
           className="focus-ring flex min-h-11 items-center justify-center rounded-md bg-[#eef1ea] text-sm font-medium"
-          href="/tasks"
+          href="/tasks/inbox"
         >
-          Tasks
+          Inbox
         </Link>
         <Link
           className="focus-ring flex min-h-11 items-center justify-center rounded-md bg-[#eef1ea] text-sm font-medium"

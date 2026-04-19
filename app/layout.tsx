@@ -41,8 +41,11 @@ export default function RootLayout({
               <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/">
                 Dashboard
               </Link>
+              <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/tasks/inbox">
+                Task Inbox
+              </Link>
               <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/tasks">
-                Tasks
+                Task Buckets
               </Link>
               <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/import">
                 Import
