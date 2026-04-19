@@ -22,7 +22,7 @@ export function getDerivedRenewalDates(renewalDate: string): DerivedRenewalDates
   );
 
   return {
-    mc_discussion_date: toDateOnly(addDays(renewal, -90)),
+    mc_discussion_date: toDateOnly(addDays(renewal, -120)),
     member_discussion_date: toDateOnly(addDays(renewal, -60)),
     documents_sent_date: toDateOnly(addDays(renewal, -45)),
     payment_due_date: toDateOnly(addDays(renewal, -30)),
@@ -42,6 +42,10 @@ export function calculateStage(
 
   if (renewalCycle.status === "dropped") {
     return "Dropped";
+  }
+
+  if (!isWithinRenewalWorkWindow(renewalCycle.renewal_date, today)) {
+    return null;
   }
 
   const todayOnly = toDateOnly(
@@ -75,6 +79,13 @@ function isTaskCompleted(
   taskType: RenewalTask["task_type"],
 ): boolean {
   return tasks.some((task) => task.task_type === taskType && task.status === "completed");
+}
+
+export function isWithinRenewalWorkWindow(renewalDate: string, today = new Date()): boolean {
+  const todayOnly = toDateOnly(
+    new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())),
+  );
+  return todayOnly >= getDerivedRenewalDates(renewalDate).mc_discussion_date;
 }
 
 export const renewalStages: RenewalStage[] = [

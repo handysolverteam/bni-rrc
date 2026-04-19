@@ -25,7 +25,7 @@ const cycle: RenewalCycle = {
 
 describe("renewal tasks", () => {
   it("returns active trigger tasks due through the end of next week", () => {
-    const triggers = getDueTaskTriggers(cycle, new Date("2026-04-14T00:00:00.000Z"));
+    const triggers = getDueTaskTriggers(cycle, new Date("2026-03-03T00:00:00.000Z"));
 
     expect(triggers.map((trigger) => trigger.type)).toEqual([
       "mc_discussion",
@@ -36,7 +36,7 @@ describe("renewal tasks", () => {
     const triggers = getDueTaskTriggers(cycle, new Date("2026-06-09T00:00:00.000Z"));
 
     expect(triggers).toEqual([
-      { type: "mc_discussion", dueDate: "2026-04-02" },
+      { type: "mc_discussion", dueDate: "2026-03-03" },
       { type: "member_discussion", dueDate: "2026-05-02" },
       { type: "docs_collection", dueDate: "2026-05-17" },
       { type: "payment_due", dueDate: "2026-06-01" },
@@ -53,6 +53,10 @@ describe("renewal tasks", () => {
 
   it("does not generate triggers for completed renewal cycles", () => {
     expect(getDueTaskTriggers({ ...cycle, status: "renewed" })).toEqual([]);
+  });
+
+  it("does not generate triggers before the 120-day renewal work window", () => {
+    expect(getDueTaskTriggers(cycle, new Date("2026-03-02T00:00:00.000Z"))).toEqual([]);
   });
 });
 

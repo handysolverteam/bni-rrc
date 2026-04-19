@@ -1,11 +1,13 @@
 import type { Member, RenewalTask } from "../types";
+import { activeRenewalTaskTypes } from "./task-types";
 import type { Urgency, UrgencyLabel } from "./urgency";
 
-export type TaskInboxItem = RenewalTask &
-  Urgency & {
+export type TaskInboxCandidate = RenewalTask & {
     member: Member;
     renewal_date: string;
   };
+
+export type TaskInboxItem = TaskInboxCandidate & Urgency;
 
 export type TaskInboxGroups = Record<UrgencyLabel, TaskInboxItem[]>;
 
@@ -23,4 +25,32 @@ export function sortInboxTasks(tasks: TaskInboxItem[]): TaskInboxItem[] {
       second.urgency_score - first.urgency_score ||
       first.due_date.localeCompare(second.due_date),
   );
+}
+
+export function getNextInboxTasksByMember<T extends TaskInboxCandidate>(tasks: T[]): T[] {
+  const tasksByMember = new Map<string, T[]>();
+
+  for (const task of tasks) {
+    const memberTasks = tasksByMember.get(task.member.id) ?? [];
+    memberTasks.push(task);
+    tasksByMember.set(task.member.id, memberTasks);
+  }
+
+  return Array.from(tasksByMember.values()).flatMap((memberTasks) => {
+    const earliestRenewalDate = memberTasks
+      .map((task) => task.renewal_date)
+      .sort((first, second) => first.localeCompare(second))[0];
+    const currentCycleTasks = memberTasks.filter(
+      (task) => task.renewal_date === earliestRenewalDate,
+    );
+    const nextTask = activeRenewalTaskTypes
+      .map((taskType) =>
+        currentCycleTasks.find(
+          (task) => task.task_type === taskType && task.status === "open",
+        ),
+      )
+      .find((task): task is T => Boolean(task));
+
+    return nextTask ? [nextTask] : [];
+  });
 }

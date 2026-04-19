@@ -48,7 +48,7 @@ function cycle(tasks: RenewalTask[]): DashboardCycle {
     },
     stage: "Member Discussion",
     derived_dates: {
-      mc_discussion_date: "2026-04-02",
+      mc_discussion_date: "2026-03-03",
       member_discussion_date: "2026-05-02",
       documents_sent_date: "2026-05-17",
       payment_due_date: "2026-06-01",
@@ -121,5 +121,16 @@ describe("dashboard task buckets", () => {
     );
 
     expect(buckets.thisWeek.map((item) => item.id)).toEqual(["first", "second"]);
+  });
+
+  it("excludes tasks for cycles outside the 120-day renewal work window", () => {
+    const buckets = getDashboardTaskBuckets(
+      [{ ...cycle([task("future-cycle", "2026-04-15")]), renewal_date: "2026-09-01" }],
+      today,
+    );
+
+    expect(buckets.pastDue).toEqual([]);
+    expect(buckets.thisWeek).toEqual([]);
+    expect(buckets.nextWeek).toEqual([]);
   });
 });

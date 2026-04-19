@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { calculateStage, getDerivedRenewalDates } from "../lib/renewals/stage";
+import {
+  calculateStage,
+  getDerivedRenewalDates,
+  isWithinRenewalWorkWindow,
+} from "../lib/renewals/stage";
 import type { RenewalTask, RenewalTaskType } from "../lib/types";
 
 const baseCycle = {
@@ -33,9 +37,9 @@ describe("calculateStage", () => {
   });
 
   it("uses the first incomplete required task as the active stage", () => {
-    expect(calculateStage({ ...baseCycle, renewal_tasks: [] }, utc("2026-03-31"))).toBe("MC Discussion");
+    expect(calculateStage({ ...baseCycle, renewal_tasks: [] }, utc("2026-03-03"))).toBe("MC Discussion");
     expect(
-      calculateStage({ ...baseCycle, renewal_tasks: [task("mc_discussion")] }, utc("2026-03-31")),
+      calculateStage({ ...baseCycle, renewal_tasks: [task("mc_discussion")] }, utc("2026-03-03")),
     ).toBe("Member Discussion");
     expect(
       calculateStage(
@@ -43,7 +47,7 @@ describe("calculateStage", () => {
           ...baseCycle,
           renewal_tasks: [task("mc_discussion"), task("member_discussion")],
         },
-        utc("2026-03-31"),
+        utc("2026-03-03"),
       ),
     ).toBe("Documents Pending");
     expect(
@@ -56,7 +60,7 @@ describe("calculateStage", () => {
             task("docs_collection"),
           ],
         },
-        utc("2026-03-31"),
+        utc("2026-03-03"),
       ),
     ).toBe("Payment Pending");
   });
@@ -73,7 +77,7 @@ describe("calculateStage", () => {
             task("payment_due"),
           ],
         },
-        utc("2026-03-31"),
+        utc("2026-03-03"),
       ),
     ).toBe("Payment Pending");
   });
@@ -85,9 +89,13 @@ describe("calculateStage", () => {
           ...baseCycle,
           renewal_tasks: [task("mc_discussion"), task("member_discussion", "cancelled")],
         },
-        utc("2026-03-31"),
+        utc("2026-03-03"),
       ),
     ).toBe("Member Discussion");
+  });
+
+  it("keeps active cycles out of workflow before 120 days", () => {
+    expect(calculateStage({ ...baseCycle, renewal_tasks: [] }, utc("2026-03-02"))).toBeNull();
   });
 
   it("keeps critical deadline as an active-cycle deadline override", () => {
@@ -102,11 +110,16 @@ describe("calculateStage", () => {
 
   it("calculates active workflow dates", () => {
     expect(getDerivedRenewalDates("2026-06-01")).toMatchObject({
-      mc_discussion_date: "2026-03-03",
+      mc_discussion_date: "2026-02-01",
       member_discussion_date: "2026-04-02",
       documents_sent_date: "2026-04-17",
       payment_due_date: "2026-05-02",
       final_deadline: "2026-05-15",
     });
+  });
+
+  it("identifies the 120-day renewal work window", () => {
+    expect(isWithinRenewalWorkWindow("2026-07-01", utc("2026-03-02"))).toBe(false);
+    expect(isWithinRenewalWorkWindow("2026-07-01", utc("2026-03-03"))).toBe(true);
   });
 });

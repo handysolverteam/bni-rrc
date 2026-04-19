@@ -6,7 +6,7 @@ import type {
   RenewalCycle,
   RenewalTask,
 } from "../types";
-import { calculateStage, getDerivedRenewalDates } from "./stage";
+import { calculateStage, getDerivedRenewalDates, isWithinRenewalWorkWindow } from "./stage";
 import { isActiveRenewalTaskType } from "./task-types";
 
 type RenewalCycleRow = RenewalCycle & {
@@ -64,7 +64,7 @@ export async function getDashboardCycles(today = new Date()): Promise<DashboardC
   }
 
   return ((data ?? []) as RenewalCycleRow[])
-    .filter((row) => row.members)
+    .filter((row) => row.members && isWithinRenewalWorkWindow(row.renewal_date, today))
     .map((row) => enrichCycle(row, today));
 }
 

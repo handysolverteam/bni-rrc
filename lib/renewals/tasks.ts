@@ -1,7 +1,7 @@
 import { sendNotification } from "../notifications";
 import { getServiceSupabase } from "../supabase/server";
 import type { RenewalCycle, RenewalTaskType } from "../types";
-import { getDerivedRenewalDates } from "./stage";
+import { getDerivedRenewalDates, isWithinRenewalWorkWindow } from "./stage";
 
 type Trigger = {
   type: RenewalTaskType;
@@ -31,7 +31,7 @@ function endOfNextWeekDateOnly(today: Date): string {
 }
 
 export function getDueTaskTriggers(cycle: RenewalCycle, today = new Date()): Trigger[] {
-  if (cycle.status !== "active") {
+  if (cycle.status !== "active" || !isWithinRenewalWorkWindow(cycle.renewal_date, today)) {
     return [];
   }
 

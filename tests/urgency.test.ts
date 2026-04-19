@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { sortInboxTasks, type TaskInboxItem } from "../lib/renewals/task-inbox-model";
+import {
+  getNextInboxTasksByMember,
+  sortInboxTasks,
+  type TaskInboxItem,
+} from "../lib/renewals/task-inbox-model";
 import { getUrgency } from "../lib/renewals/urgency";
-import type { Member } from "../lib/types";
+import type { Member, RenewalTask, RenewalTaskType } from "../lib/types";
 
 const member: Member = {
   id: "member-1",
@@ -13,7 +17,12 @@ const member: Member = {
   is_committee: false,
 };
 
-function inboxTask(id: string, dueDate: string, score: 100 | 70 | 30): TaskInboxItem {
+function inboxTask(
+  id: string,
+  dueDate: string,
+  score: 100 | 70 | 30,
+  overrides: Partial<TaskInboxItem> = {},
+): TaskInboxItem {
   return {
     id,
     renewal_cycle_id: "cycle-1",
@@ -27,7 +36,24 @@ function inboxTask(id: string, dueDate: string, score: 100 | 70 | 30): TaskInbox
     urgency_score: score,
     urgency_label: score === 100 ? "overdue" : score === 70 ? "due_soon" : "upcoming",
     color: score === 100 ? "red" : score === 70 ? "yellow" : "green",
+    ...overrides,
   };
+}
+
+function openTask(
+  id: string,
+  taskType: RenewalTaskType,
+  memberId = "member-1",
+  renewalDate = "2026-07-01",
+  status: RenewalTask["status"] = "open",
+): TaskInboxItem {
+  return inboxTask(id, "2026-04-19", 70, {
+    task_type: taskType,
+    status,
+    member: { ...member, id: memberId, name: `Member ${memberId}` },
+    renewal_cycle_id: `${memberId}-${renewalDate}`,
+    renewal_date: renewalDate,
+  });
 }
 
 describe("renewal task urgency", () => {
@@ -71,5 +97,43 @@ describe("renewal task urgency", () => {
       "due-soon",
       "upcoming",
     ]);
+  });
+
+  it("selects only the first open workflow task for each member", () => {
+    const selected = getNextInboxTasksByMember([
+      openTask("docs", "docs_collection"),
+      openTask("mc", "mc_discussion"),
+      openTask("member", "member_discussion"),
+    ]);
+
+    expect(selected.map((task) => task.id)).toEqual(["mc"]);
+  });
+
+  it("keeps one next task for each member", () => {
+    const selected = getNextInboxTasksByMember([
+      openTask("member-1-mc", "mc_discussion", "member-1"),
+      openTask("member-1-payment", "payment_due", "member-1"),
+      openTask("member-2-docs", "docs_collection", "member-2"),
+    ]);
+
+    expect(selected.map((task) => task.id).sort()).toEqual(["member-1-mc", "member-2-docs"]);
+  });
+
+  it("shows the next workflow task when earlier tasks are already absent from open tasks", () => {
+    const selected = getNextInboxTasksByMember([
+      openTask("docs", "docs_collection"),
+      openTask("payment", "payment_due"),
+    ]);
+
+    expect(selected.map((task) => task.id)).toEqual(["docs"]);
+  });
+
+  it("uses the earliest renewal cycle when a member has multiple active cycles", () => {
+    const selected = getNextInboxTasksByMember([
+      openTask("later-mc", "mc_discussion", "member-1", "2026-09-01"),
+      openTask("earlier-payment", "payment_due", "member-1", "2026-07-01"),
+    ]);
+
+    expect(selected.map((task) => task.id)).toEqual(["earlier-payment"]);
   });
 });

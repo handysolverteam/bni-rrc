@@ -1,4 +1,5 @@
 import type { DashboardCycle, RenewalTask } from "../types";
+import { isWithinRenewalWorkWindow } from "./stage";
 import { isActiveRenewalTaskType } from "./task-types";
 
 export type DashboardTaskBucketKey = "pastDue" | "thisWeek" | "nextWeek";
@@ -45,6 +46,10 @@ export function getDashboardTaskBuckets(
   };
 
   for (const cycle of cycles) {
+    if (!isWithinRenewalWorkWindow(cycle.renewal_date, today)) {
+      continue;
+    }
+
     for (const task of cycle.renewal_tasks) {
       if (task.status !== "open" || !isActiveRenewalTaskType(task.task_type)) {
         continue;
