@@ -47,6 +47,7 @@ function cycle(tasks: RenewalTask[]): DashboardCycle {
       is_committee: false,
     },
     latest_traffic_light: null,
+    traffic_light_history: [],
     stage: "Member Discussion",
     derived_dates: {
       mc_discussion_date: "2026-03-03",

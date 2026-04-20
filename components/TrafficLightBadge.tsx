@@ -1,7 +1,8 @@
-import { formatDisplayDate } from "@/lib/date-format";
+import { formatDisplayMonth } from "@/lib/date-format";
+import { sortTrafficLightHistoryForDisplay } from "@/lib/renewals/traffic-light-history";
 import type { MemberTrafficLight, TrafficLightColor } from "@/lib/types";
 
-const trafficLightDotClasses: Record<TrafficLightColor, string> = {
+export const trafficLightDotClasses: Record<TrafficLightColor, string> = {
   green: "bg-[#2f855a]",
   yellow: "bg-[#c49323]",
   red: "bg-[#c73b2f]",
@@ -25,7 +26,35 @@ export default function TrafficLightBadge({
       <span className="font-medium text-[var(--ink)]">
         {formatTrafficLightColor(trafficLight.color)} {trafficLight.score}
       </span>
-      {!compact ? <span>{formatDisplayDate(trafficLight.report_month)}</span> : null}
+      {!compact ? <span>{formatDisplayMonth(trafficLight.report_month)}</span> : null}
     </p>
+  );
+}
+
+export function TrafficLightTrend({
+  history,
+  className = "",
+}: {
+  history: MemberTrafficLight[];
+  className?: string;
+}) {
+  const displayHistory = sortTrafficLightHistoryForDisplay(history);
+
+  if (displayHistory.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className={`flex items-center gap-1.5 ${className}`} aria-label="Traffic light trend">
+      {displayHistory.map((trafficLight) => (
+        <span
+          key={`${trafficLight.member_id}-${trafficLight.report_month}`}
+          className={`h-2.5 w-2.5 rounded-full ${trafficLightDotClasses[trafficLight.color]}`}
+          title={`${formatDisplayMonth(trafficLight.report_month)}: ${formatTrafficLightColor(
+            trafficLight.color,
+          )} ${trafficLight.score}`}
+        />
+      ))}
+    </div>
   );
 }

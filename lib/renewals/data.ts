@@ -9,6 +9,9 @@ import type {
 } from "../types";
 import { calculateStage, getDerivedRenewalDates, isWithinRenewalWorkWindow } from "./stage";
 import { isActiveRenewalTaskType } from "./task-types";
+import {
+  groupTrafficLightHistoryByMember,
+} from "./traffic-light-history";
 
 type RenewalCycleRow = RenewalCycle & {
   members: Member | null;
@@ -23,12 +26,13 @@ type RenewalCycleRow = RenewalCycle & {
 export function enrichCycle(
   row: RenewalCycleRow,
   today = new Date(),
-  latestTrafficLight: MemberTrafficLight | null = null,
+  trafficLightHistory: MemberTrafficLight[] = [],
 ): DashboardCycle {
   return {
     ...row,
     member: row.members!,
-    latest_traffic_light: latestTrafficLight,
+    latest_traffic_light: trafficLightHistory[0] ?? null,
+    traffic_light_history: trafficLightHistory,
     stage: calculateStage(
       {
         renewal_date: row.renewal_date,
@@ -48,9 +52,9 @@ export function enrichCycle(
   };
 }
 
-async function getLatestTrafficLightsByMember(
+async function getTrafficLightHistoriesByMember(
   memberIds: string[],
-): Promise<Map<string, MemberTrafficLight>> {
+): Promise<Map<string, MemberTrafficLight[]>> {
   if (memberIds.length === 0) {
     return new Map();
   }
@@ -66,15 +70,7 @@ async function getLatestTrafficLightsByMember(
     throw error;
   }
 
-  const latestByMember = new Map<string, MemberTrafficLight>();
-
-  for (const trafficLight of (data ?? []) as MemberTrafficLight[]) {
-    if (!latestByMember.has(trafficLight.member_id)) {
-      latestByMember.set(trafficLight.member_id, trafficLight);
-    }
-  }
-
-  return latestByMember;
+  return groupTrafficLightHistoryByMember((data ?? []) as MemberTrafficLight[]);
 }
 
 export async function getDashboardCycles(today = new Date()): Promise<DashboardCycle[]> {
@@ -101,12 +97,12 @@ export async function getDashboardCycles(today = new Date()): Promise<DashboardC
   const rows = ((data ?? []) as RenewalCycleRow[]).filter(
     (row) => row.members && isWithinRenewalWorkWindow(row.renewal_date, today),
   );
-  const latestTrafficLights = await getLatestTrafficLightsByMember(
+  const trafficLightHistories = await getTrafficLightHistoriesByMember(
     rows.map((row) => row.member_id),
   );
 
   return rows.map((row) =>
-    enrichCycle(row, today, latestTrafficLights.get(row.member_id) ?? null),
+    enrichCycle(row, today, trafficLightHistories.get(row.member_id) ?? []),
   );
 }
 
@@ -142,10 +138,10 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     throw cyclesError;
   }
 
-  const latestTrafficLights = await getLatestTrafficLightsByMember([memberId]);
-  const latestTrafficLight = latestTrafficLights.get(memberId) ?? null;
+  const trafficLightHistories = await getTrafficLightHistoriesByMember([memberId]);
+  const trafficLightHistory = trafficLightHistories.get(memberId) ?? [];
   const enrichedCycles = ((cycles ?? []) as RenewalCycleRow[]).map((row) =>
-    enrichCycle({ ...row, members: member as Member }, today, latestTrafficLight),
+    enrichCycle({ ...row, members: member as Member }, today, trafficLightHistory),
   );
 
   return {

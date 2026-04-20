@@ -31,6 +31,7 @@ function cycle(stage: DashboardCycle["stage"]): DashboardCycle {
       is_committee: false,
     },
     latest_traffic_light: null,
+    traffic_light_history: [],
     stage,
     derived_dates: {
       mc_discussion_date: "2026-04-02",

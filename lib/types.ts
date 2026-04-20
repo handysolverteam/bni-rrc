@@ -99,6 +99,7 @@ export type DerivedRenewalDates = {
 export type DashboardCycle = RenewalCycle & {
   member: Member;
   latest_traffic_light: MemberTrafficLight | null;
+  traffic_light_history: MemberTrafficLight[];
   stage: RenewalStage | null;
   derived_dates: DerivedRenewalDates;
   assignments: RenewalAssignment[];

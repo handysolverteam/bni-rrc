@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { formatDisplayDate } from "@/lib/date-format";
+import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
+import { sortTrafficLightHistoryForDisplay } from "@/lib/renewals/traffic-light-history";
 import type { DashboardCycle, Member } from "@/lib/types";
 import TaskList from "./TaskList";
-import TrafficLightBadge from "./TrafficLightBadge";
+import TrafficLightBadge, { formatTrafficLightColor, TrafficLightTrend } from "./TrafficLightBadge";
 
 type MemberDetailPayload = {
   member: Member;
@@ -15,6 +16,9 @@ type MemberDetailPayload = {
 export default function MemberDetail({ detail }: { detail: MemberDetailPayload }) {
   const router = useRouter();
   const cycle = detail.currentCycle;
+  const trafficLightHistory = cycle
+    ? sortTrafficLightHistoryForDisplay(cycle.traffic_light_history)
+    : [];
 
   async function updateCycle(payload: Record<string, unknown>) {
     if (!cycle) {
@@ -77,6 +81,34 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
             <div className="mt-3">
               <TrafficLightBadge trafficLight={cycle.latest_traffic_light} />
             </div>
+            <TrafficLightTrend className="mt-3" history={cycle.traffic_light_history} />
+            {trafficLightHistory.length > 0 ? (
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--line)] text-[var(--muted)]">
+                      <th className="py-2 pr-3 font-medium">Month</th>
+                      <th className="py-2 pr-3 font-medium">Score</th>
+                      <th className="py-2 pr-3 font-medium">Light</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trafficLightHistory.map((trafficLight) => (
+                      <tr
+                        key={`${trafficLight.member_id}-${trafficLight.report_month}`}
+                        className="border-b border-[var(--line)] last:border-0"
+                      >
+                        <td className="py-2 pr-3">
+                          {formatDisplayMonth(trafficLight.report_month)}
+                        </td>
+                        <td className="py-2 pr-3">{trafficLight.score}</td>
+                        <td className="py-2 pr-3">{formatTrafficLightColor(trafficLight.color)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <dt className="text-[var(--muted)]">P</dt>
