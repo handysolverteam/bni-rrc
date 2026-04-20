@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { formatDisplayDate } from "@/lib/date-format";
 import type { DashboardCycle, Member } from "@/lib/types";
 import TaskList from "./TaskList";
+import TrafficLightBadge from "./TrafficLightBadge";
 
 type MemberDetailPayload = {
   member: Member;
@@ -70,6 +71,40 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
+        {cycle.latest_traffic_light ? (
+          <div className="rounded-md border border-[var(--line)] bg-white p-4">
+            <h2 className="text-xl font-semibold tracking-normal">Traffic light</h2>
+            <div className="mt-3">
+              <TrafficLightBadge trafficLight={cycle.latest_traffic_light} />
+            </div>
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <dt className="text-[var(--muted)]">P</dt>
+                <dd>{cycle.latest_traffic_light.present_count}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">A</dt>
+                <dd>{cycle.latest_traffic_light.absent_count}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">RGT</dt>
+                <dd>{cycle.latest_traffic_light.referrals_given}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">RRT</dt>
+                <dd>{cycle.latest_traffic_light.referrals_received}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">Visitors</dt>
+                <dd>{cycle.latest_traffic_light.visitors}</dd>
+              </div>
+              <div>
+                <dt className="text-[var(--muted)]">Trainings</dt>
+                <dd>{cycle.latest_traffic_light.trainings}</dd>
+              </div>
+            </dl>
+          </div>
+        ) : null}
         <div className="rounded-md border border-[var(--line)] bg-white p-4">
           <h2 className="text-xl font-semibold tracking-normal">Renewal dates</h2>
           <dl className="mt-4 space-y-2 text-sm">

@@ -7,6 +7,8 @@ export type Urgency = {
   color: UrgencyColor;
 };
 
+export const DUE_SOON_DAYS = 10;
+
 function parseDateOnly(date: string): Date {
   const [year, month, day] = date.slice(0, 10).split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day));
@@ -29,7 +31,7 @@ export function getUrgency(dueDate: string, today = new Date()): Urgency {
     };
   }
 
-  if (daysUntilDue <= 5) {
+  if (daysUntilDue <= DUE_SOON_DAYS) {
     return {
       urgency_score: 70,
       urgency_label: "due_soon",

@@ -4,11 +4,11 @@ export default function ImportPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <p className="text-sm font-medium text-[var(--accent)]">Membership dues report</p>
+        <p className="text-sm font-medium text-[var(--accent)]">Imports</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-normal">Import members</h1>
         <p className="mt-2 text-sm text-[var(--muted)]">
-          Upload the BNI Chapter Membership Dues Report `.xls` file to create members and yearly
-          renewal cycles.
+          Upload membership dues reports for renewal cycles and monthly traffic-light PDFs for
+          member scores.
         </p>
       </div>
       <ImportForm />

@@ -2,6 +2,7 @@ import { getServiceSupabase } from "../supabase/server";
 import type {
   DashboardCycle,
   Member,
+  MemberTrafficLight,
   RenewalAssignment,
   RenewalCycle,
   RenewalTask,
@@ -19,10 +20,15 @@ type RenewalCycleRow = RenewalCycle & {
   renewal_tasks: RenewalTask[];
 };
 
-export function enrichCycle(row: RenewalCycleRow, today = new Date()): DashboardCycle {
+export function enrichCycle(
+  row: RenewalCycleRow,
+  today = new Date(),
+  latestTrafficLight: MemberTrafficLight | null = null,
+): DashboardCycle {
   return {
     ...row,
     member: row.members!,
+    latest_traffic_light: latestTrafficLight,
     stage: calculateStage(
       {
         renewal_date: row.renewal_date,
@@ -40,6 +46,35 @@ export function enrichCycle(row: RenewalCycleRow, today = new Date()): Dashboard
       (task) => task.status === "open" && isActiveRenewalTaskType(task.task_type),
     ).length,
   };
+}
+
+async function getLatestTrafficLightsByMember(
+  memberIds: string[],
+): Promise<Map<string, MemberTrafficLight>> {
+  if (memberIds.length === 0) {
+    return new Map();
+  }
+
+  const supabase = getServiceSupabase();
+  const { data, error } = await supabase
+    .from("member_traffic_lights")
+    .select("*")
+    .in("member_id", memberIds)
+    .order("report_month", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const latestByMember = new Map<string, MemberTrafficLight>();
+
+  for (const trafficLight of (data ?? []) as MemberTrafficLight[]) {
+    if (!latestByMember.has(trafficLight.member_id)) {
+      latestByMember.set(trafficLight.member_id, trafficLight);
+    }
+  }
+
+  return latestByMember;
 }
 
 export async function getDashboardCycles(today = new Date()): Promise<DashboardCycle[]> {
@@ -63,9 +98,16 @@ export async function getDashboardCycles(today = new Date()): Promise<DashboardC
     throw error;
   }
 
-  return ((data ?? []) as RenewalCycleRow[])
-    .filter((row) => row.members && isWithinRenewalWorkWindow(row.renewal_date, today))
-    .map((row) => enrichCycle(row, today));
+  const rows = ((data ?? []) as RenewalCycleRow[]).filter(
+    (row) => row.members && isWithinRenewalWorkWindow(row.renewal_date, today),
+  );
+  const latestTrafficLights = await getLatestTrafficLightsByMember(
+    rows.map((row) => row.member_id),
+  );
+
+  return rows.map((row) =>
+    enrichCycle(row, today, latestTrafficLights.get(row.member_id) ?? null),
+  );
 }
 
 export async function getMemberDetail(memberId: string, today = new Date()) {
@@ -100,8 +142,10 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     throw cyclesError;
   }
 
+  const latestTrafficLights = await getLatestTrafficLightsByMember([memberId]);
+  const latestTrafficLight = latestTrafficLights.get(memberId) ?? null;
   const enrichedCycles = ((cycles ?? []) as RenewalCycleRow[]).map((row) =>
-    enrichCycle({ ...row, members: member as Member }, today),
+    enrichCycle({ ...row, members: member as Member }, today, latestTrafficLight),
   );
 
   return {

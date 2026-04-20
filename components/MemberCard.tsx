@@ -4,6 +4,7 @@ import { getNextWorkflowTask } from "@/lib/renewals/task-inbox-model";
 import { taskTypeLabels } from "@/lib/renewals/task-types";
 import { getUrgency, type UrgencyLabel } from "@/lib/renewals/urgency";
 import type { DashboardCycle } from "@/lib/types";
+import TrafficLightBadge from "./TrafficLightBadge";
 
 const cardAccentClasses = {
   red: "border-l-[#c73b2f]",
@@ -44,6 +45,12 @@ export default function MemberCard({ cycle }: { cycle: DashboardCycle }) {
         <h3 className="font-semibold">{cycle.member.name}</h3>
         <p className="text-sm text-[var(--muted)]">{cycle.member.industry || "No industry"}</p>
       </div>
+
+      {cycle.latest_traffic_light ? (
+        <div className="mt-3">
+          <TrafficLightBadge trafficLight={cycle.latest_traffic_light} />
+        </div>
+      ) : null}
 
       {nextTask && urgency ? (
         <div className="mt-4 space-y-1 text-sm">

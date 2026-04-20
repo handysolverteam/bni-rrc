@@ -68,16 +68,16 @@ describe("renewal task urgency", () => {
     });
   });
 
-  it("marks dates through the next five days as due soon", () => {
-    expect(getUrgency("2026-04-24", today)).toEqual({
+  it("marks dates through the next ten days as due soon", () => {
+    expect(getUrgency("2026-04-29", today)).toEqual({
       urgency_score: 70,
       urgency_label: "due_soon",
       color: "yellow",
     });
   });
 
-  it("marks dates more than five days away as upcoming", () => {
-    expect(getUrgency("2026-04-25", today)).toEqual({
+  it("marks dates more than ten days away as upcoming", () => {
+    expect(getUrgency("2026-04-30", today)).toEqual({
       urgency_score: 30,
       urgency_label: "upcoming",
       color: "green",

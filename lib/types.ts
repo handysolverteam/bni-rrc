@@ -1,4 +1,5 @@
 export type RenewalStatus = "active" | "renewed" | "dropped";
+export type TrafficLightColor = "green" | "yellow" | "red" | "grey";
 
 export type RenewalStage =
   | "MC Discussion"
@@ -26,6 +27,27 @@ export type Member = {
   sponsor: string | null;
   report_role: string | null;
   is_committee: boolean;
+};
+
+export type MemberTrafficLight = {
+  id: string;
+  member_id: string;
+  report_month: string;
+  score: number;
+  color: TrafficLightColor;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  medical_count: number;
+  substitute_count: number;
+  referrals_given: number;
+  referrals_received: number;
+  visitors: number;
+  testimonials: number;
+  tyfcb: number | null;
+  trainings: number;
+  week_count: number;
+  import_batch_id: string | null;
 };
 
 export type RenewalCycle = {
@@ -76,6 +98,7 @@ export type DerivedRenewalDates = {
 
 export type DashboardCycle = RenewalCycle & {
   member: Member;
+  latest_traffic_light: MemberTrafficLight | null;
   stage: RenewalStage | null;
   derived_dates: DerivedRenewalDates;
   assignments: RenewalAssignment[];

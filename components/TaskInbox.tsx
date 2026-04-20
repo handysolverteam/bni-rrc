@@ -8,7 +8,7 @@ import type { RenewalTask } from "@/lib/types";
 
 const sectionLabels = {
   overdue: "🔴 Overdue",
-  due_soon: "🟡 Due Soon (Next 5 Days)",
+  due_soon: "🟡 Due Soon (Next 10 Days)",
   upcoming: "🟢 Upcoming",
 };
 
