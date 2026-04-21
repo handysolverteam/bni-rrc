@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { formatDisplayDate, formatDisplayMonth, formatTenure } from "@/lib/date-format";
 import { buildMemberAchievements } from "@/lib/renewals/achievements";
+import { buildMemberAchievementShareText } from "@/lib/renewals/achievement-share";
 import { sortTrafficLightHistoryForDisplay } from "@/lib/renewals/traffic-light-history";
 import type {
   ChapterRole,
@@ -43,6 +45,8 @@ function formatCurrency(value: number | null): string {
 }
 
 export default function MemberAchievements({ detail }: { detail: MemberAchievementsPayload }) {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const trafficLightHistory = detail.currentCycle?.traffic_light_history ?? [];
   const recentTrafficLights = sortTrafficLightHistoryForDisplay(trafficLightHistory).slice(-6);
   const achievements = buildMemberAchievements(detail.latestPalmsSnapshot, trafficLightHistory);
@@ -55,6 +59,24 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
     formatDisplayDate(detail.member.member_since) === "-"
       ? "Joining date not set"
       : formatDisplayDate(detail.member.member_since);
+  const shareText = buildMemberAchievementShareText({
+    memberName: detail.member.name,
+    roles: detail.pastRoles,
+    renewalLabel,
+    tenureLabel,
+    joiningDateLabel,
+    achievements,
+    trafficLightHistory,
+  });
+
+  async function handleCopyMessage() {
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopyState("copied");
+    } catch {
+      setCopyState("error");
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -97,6 +119,43 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
               <HeroHighlightCard label="Renewal" value={renewalLabel} />
               <HeroHighlightCard label="Tenure" value={tenureLabel} />
               <HeroHighlightCard label="Joined on" value={joiningDateLabel} />
+            </div>
+            <div className="mt-4 rounded-md border border-[var(--line)] bg-[#f7f7f4] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                    Shareable summary
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    Short WhatsApp-ready recognition text for easy forwarding.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white"
+                    onClick={handleCopyMessage}
+                    type="button"
+                  >
+                    {copyState === "copied"
+                      ? "Copied"
+                      : copyState === "error"
+                        ? "Copy failed"
+                        : "Copy message"}
+                  </button>
+                  <button
+                    className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--accent)]"
+                    onClick={() => setIsPreviewOpen((currentValue) => !currentValue)}
+                    type="button"
+                  >
+                    {isPreviewOpen ? "Hide preview" : "Preview text"}
+                  </button>
+                </div>
+              </div>
+              {isPreviewOpen ? (
+                <pre className="mt-4 whitespace-pre-wrap rounded-md border border-[var(--line)] bg-white p-3 text-sm leading-6 text-[var(--ink)]">
+                  {shareText}
+                </pre>
+              ) : null}
             </div>
             <p className="mt-3 text-sm text-[var(--muted)]">
               {achievements.source === "palms"
