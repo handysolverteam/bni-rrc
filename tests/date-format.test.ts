@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDisplayDate, formatDisplayMonth } from "../lib/date-format";
+import { formatDisplayDate, formatDisplayMonth, formatTenure } from "../lib/date-format";
 
 describe("formatDisplayDate", () => {
   it("formats ISO date strings for display", () => {
@@ -30,5 +30,29 @@ describe("formatDisplayMonth", () => {
     expect(formatDisplayMonth("")).toBe("-");
     expect(formatDisplayMonth("not-a-date")).toBe("-");
     expect(formatDisplayMonth("2026-13-01")).toBe("-");
+  });
+});
+
+describe("formatTenure", () => {
+  const today = new Date(Date.UTC(2026, 3, 21));
+
+  it("formats multiple years and months", () => {
+    expect(formatTenure("2018-01-15", today)).toBe("8 years 3 months");
+  });
+
+  it("formats durations under one year", () => {
+    expect(formatTenure("2025-05-10", today)).toBe("11 months");
+  });
+
+  it("formats very recent dates as less than one month", () => {
+    expect(formatTenure("2026-04-10", today)).toBe("Less than 1 month");
+  });
+
+  it("returns a clear fallback for missing or invalid dates", () => {
+    expect(formatTenure(null, today)).toBe("Tenure not set");
+    expect(formatTenure(undefined, today)).toBe("Tenure not set");
+    expect(formatTenure("", today)).toBe("Tenure not set");
+    expect(formatTenure("invalid", today)).toBe("Tenure not set");
+    expect(formatTenure("2026-13-01", today)).toBe("Tenure not set");
   });
 });

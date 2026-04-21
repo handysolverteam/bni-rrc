@@ -10,6 +10,9 @@ type ImportResult = {
 };
 
 export default function ImportForm() {
+  const [palmsSubmitting, setPalmsSubmitting] = useState(false);
+  const [palmsResult, setPalmsResult] = useState<ImportResult | null>(null);
+  const [palmsError, setPalmsError] = useState<string | null>(null);
   const [duesSubmitting, setDuesSubmitting] = useState(false);
   const [duesResult, setDuesResult] = useState<ImportResult | null>(null);
   const [duesError, setDuesError] = useState<string | null>(null);
@@ -51,6 +54,45 @@ export default function ImportForm() {
 
   return (
     <div className="space-y-4">
+      <form
+        onSubmit={(event) =>
+          submitImport(
+            event,
+            "/api/import/palms",
+            setPalmsSubmitting,
+            setPalmsResult,
+            setPalmsError,
+          )
+        }
+        className="space-y-4 rounded-md border border-[var(--line)] bg-white p-4"
+      >
+        <div>
+          <p className="text-sm font-semibold">PALMS chapter summary `.xls`</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Upload the cumulative chapter summary report to populate lifetime member achievements.
+          </p>
+        </div>
+        <label className="block">
+          <span className="text-sm font-medium">PALMS report `.xls`</span>
+          <input
+            className="focus-ring mt-2 block w-full rounded-md border border-[var(--line)] p-2 text-sm"
+            name="file"
+            type="file"
+            accept=".xls"
+            required
+          />
+        </label>
+        <button
+          className="focus-ring min-h-11 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] disabled:opacity-60"
+          disabled={palmsSubmitting}
+          type="submit"
+        >
+          {palmsSubmitting ? "Importing..." : "Import PALMS summary"}
+        </button>
+
+        <ImportFeedback result={palmsResult} error={palmsError} />
+      </form>
+
       <form
         onSubmit={(event) =>
           submitImport(

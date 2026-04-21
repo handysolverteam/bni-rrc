@@ -53,6 +53,12 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
             <h1 className="mt-1 text-3xl font-semibold tracking-normal">{detail.member.name}</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.industry}</p>
             <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.report_role}</p>
+            <a
+              className="mt-3 inline-flex text-sm font-medium text-[var(--accent)] hover:underline"
+              href={`/members/${detail.member.id}/achievements`}
+            >
+              View achievements
+            </a>
             <div className="mt-4 rounded-md bg-[#eef1ea] px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
                 Renewal date

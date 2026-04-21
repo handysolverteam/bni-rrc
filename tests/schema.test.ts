@@ -10,4 +10,20 @@ describe("schema", () => {
     expect(sql).not.toContain("docs_deadline");
     expect(sql).not.toContain("final_deadline");
   });
+
+  it("stores PALMS lifetime snapshots separately from monthly traffic lights", () => {
+    const sql = readFileSync("supabase/migrations/005_member_palms_snapshots.sql", "utf8").toLowerCase();
+
+    expect(sql).toContain("create table public.member_palms_snapshots");
+    expect(sql).toContain("unique (member_id, chapter_name, report_from, report_to)");
+    expect(sql).toContain("referrals_given_inside");
+    expect(sql).toContain("referrals_received_outside");
+  });
+
+  it("allows storing member_since for tenure on members", () => {
+    const sql = readFileSync("supabase/migrations/006_member_since.sql", "utf8").toLowerCase();
+
+    expect(sql).toContain("alter table public.members");
+    expect(sql).toContain("add column member_since date");
+  });
 });

@@ -26,6 +26,7 @@ export type Member = {
   industry: string | null;
   sponsor: string | null;
   report_role: string | null;
+  member_since: string | null;
   is_committee: boolean;
 };
 
@@ -47,6 +48,30 @@ export type MemberTrafficLight = {
   tyfcb: number | null;
   trainings: number;
   week_count: number;
+  import_batch_id: string | null;
+};
+
+export type MemberPalmsSnapshot = {
+  id: string;
+  member_id: string;
+  chapter_name: string;
+  report_from: string;
+  report_to: string;
+  run_at: string | null;
+  present_count: number;
+  absent_count: number;
+  late_count: number;
+  medical_count: number;
+  substitute_count: number;
+  referrals_given_inside: number;
+  referrals_given_outside: number;
+  referrals_received_inside: number;
+  referrals_received_outside: number;
+  visitors: number;
+  one_to_ones: number;
+  tyfcb: number | null;
+  ceu: number;
+  trainings: number;
   import_batch_id: string | null;
 };
 
@@ -105,6 +130,12 @@ export type DashboardCycle = RenewalCycle & {
   assignments: RenewalAssignment[];
   renewal_tasks: RenewalTask[];
   open_task_count: number;
+};
+
+export type AchievementMemberListItem = {
+  member: Member;
+  currentCycle: DashboardCycle | null;
+  latestPalmsSnapshot: MemberPalmsSnapshot | null;
 };
 
 export type ImportMemberRow = {
