@@ -1,15 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { formatDisplayDate, formatTenure } from "@/lib/date-format";
+import { formatDisplayDate, formatDisplayMonth, formatTenure } from "@/lib/date-format";
 import { buildMemberAchievements } from "@/lib/renewals/achievements";
-import type { DashboardCycle, Member, MemberPalmsSnapshot } from "@/lib/types";
-import TrafficLightBadge from "./TrafficLightBadge";
+import { sortTrafficLightHistoryForDisplay } from "@/lib/renewals/traffic-light-history";
+import type {
+  ChapterRole,
+  DashboardCycle,
+  Member,
+  MemberPalmsSnapshot,
+  MemberPastRoleEntry,
+} from "@/lib/types";
+import PastRolesSection from "./PastRolesSection";
+import TrafficLightBadge, { trafficLightDotClasses } from "./TrafficLightBadge";
 
 type MemberAchievementsPayload = {
   member: Member;
   currentCycle: DashboardCycle | null;
   latestPalmsSnapshot: MemberPalmsSnapshot | null;
+  availableRoles: ChapterRole[];
+  pastRoles: MemberPastRoleEntry[];
 };
 
 function formatNumber(value: number | null): string {
@@ -34,7 +44,9 @@ function formatCurrency(value: number | null): string {
 
 export default function MemberAchievements({ detail }: { detail: MemberAchievementsPayload }) {
   const trafficLightHistory = detail.currentCycle?.traffic_light_history ?? [];
+  const recentTrafficLights = sortTrafficLightHistoryForDisplay(trafficLightHistory).slice(-6);
   const achievements = buildMemberAchievements(detail.latestPalmsSnapshot, trafficLightHistory);
+  const rolesHeld = detail.pastRoles.map((pastRole) => pastRole.role.name);
   const renewalLabel = detail.currentCycle
     ? `Renewing for ${detail.currentCycle.renewal_year}`
     : "Renewal year unavailable";
@@ -62,6 +74,25 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
             <h1 className="mt-1 text-3xl font-semibold tracking-normal">{detail.member.name}</h1>
             <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.industry || "No industry"}</p>
             <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.report_role || "No report role"}</p>
+            <div className="mt-3 rounded-md border border-[var(--line)] bg-[#f7f7f4] p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                Roles held
+              </p>
+              {rolesHeld.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {rolesHeld.map((role) => (
+                    <span
+                      key={role}
+                      className="rounded-full bg-white px-3 py-1 text-sm font-medium text-[var(--accent)] ring-1 ring-[var(--line)]"
+                    >
+                      {role}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-[var(--muted)]">No past roles added yet</p>
+              )}
+            </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <HeroHighlightCard label="Renewal" value={renewalLabel} />
               <HeroHighlightCard label="Tenure" value={tenureLabel} />
@@ -90,14 +121,57 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <AchievementCard label="Attendance" value={formatNumber(achievements.attendance.presents)} />
         <AchievementCard label="No. absences" value={formatNumber(achievements.attendance.absences)} />
         <AchievementCard label="Visitors" value={formatNumber(achievements.visitors)} />
+        <AchievementCard
+          label="Total referrals given"
+          value={formatNumber(achievements.referrals.givenTotal)}
+          emphasize
+        />
+        <AchievementCard
+          label="1-to-1s done"
+          value={formatNumber(achievements.oneToOnes)}
+          emphasize
+        />
         <AchievementCard label="Total TYFCB" value={formatCurrency(achievements.tyfcb)} />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-md border border-[var(--line)] bg-white p-4 lg:col-span-2">
+          <h2 className="text-xl font-semibold tracking-normal">Recent traffic lights</h2>
+          {recentTrafficLights.length > 0 ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+              {recentTrafficLights.map((trafficLight) => (
+                <div
+                  key={`${trafficLight.member_id}-${trafficLight.report_month}`}
+                  className="rounded-md border border-[var(--line)] bg-[#f7f7f4] p-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${trafficLightDotClasses[trafficLight.color]}`}
+                    />
+                    <p className="text-sm font-medium text-[var(--accent)]">
+                      {formatDisplayMonth(trafficLight.report_month)}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-2xl font-semibold tracking-normal text-[var(--ink)]">
+                    {trafficLight.score}
+                  </p>
+                  <p className="mt-1 text-xs uppercase tracking-wide text-[var(--muted)]">
+                    {trafficLight.color}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              No traffic-light history imported for the past six months yet.
+            </p>
+          )}
+        </div>
+
         <div className="rounded-md border border-[var(--line)] bg-white p-4">
           <h2 className="text-xl font-semibold tracking-normal">Attendance summary</h2>
           <MetricGrid
@@ -157,14 +231,36 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
           </dl>
         </div>
       </section>
+
+      <PastRolesSection
+        memberId={detail.member.id}
+        availableRoles={detail.availableRoles}
+        pastRoles={detail.pastRoles}
+      />
     </div>
   );
 }
 
-function AchievementCard({ label, value }: { label: string; value: string }) {
+function AchievementCard({
+  label,
+  value,
+  emphasize = false,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
   return (
-    <div className="rounded-md border border-[var(--line)] bg-white p-4">
-      <p className="text-sm text-[var(--muted)]">{label}</p>
+    <div
+      className={`rounded-md border p-4 ${
+        emphasize
+          ? "border-[var(--accent)] bg-[#eef1ea]"
+          : "border-[var(--line)] bg-white"
+      }`}
+    >
+      <p className={`text-sm ${emphasize ? "font-medium text-[var(--accent)]" : "text-[var(--muted)]"}`}>
+        {label}
+      </p>
       <p className="mt-2 text-2xl font-semibold tracking-normal text-[var(--accent)]">{value}</p>
     </div>
   );

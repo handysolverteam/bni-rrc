@@ -1,8 +1,10 @@
 import { getServiceSupabase } from "../supabase/server";
 import type {
   AchievementMemberListItem,
+  ChapterRole,
   DashboardCycle,
   Member,
+  MemberPastRoleEntry,
   MemberPalmsSnapshot,
   MemberTrafficLight,
   RenewalAssignment,
@@ -102,6 +104,50 @@ async function getLatestPalmsSnapshotsByMember(
   }
 
   return snapshots;
+}
+
+async function getAvailableRoles(): Promise<ChapterRole[]> {
+  const supabase = getServiceSupabase();
+  const { data, error } = await supabase
+    .from("chapter_roles")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as ChapterRole[];
+}
+
+async function getPastRolesByMember(
+  memberIds: string[],
+): Promise<Map<string, MemberPastRoleEntry[]>> {
+  if (memberIds.length === 0) {
+    return new Map();
+  }
+
+  const supabase = getServiceSupabase();
+  const { data, error } = await supabase
+    .from("member_past_roles")
+    .select("*, role:chapter_roles (*)")
+    .in("member_id", memberIds)
+    .order("display_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  const grouped = new Map<string, MemberPastRoleEntry[]>();
+
+  for (const row of (data ?? []) as MemberPastRoleEntry[]) {
+    const entries = grouped.get(row.member_id) ?? [];
+    entries.push(row);
+    grouped.set(row.member_id, entries);
+  }
+
+  return grouped;
 }
 
 export async function getDashboardCycles(today = new Date()): Promise<DashboardCycle[]> {
@@ -236,6 +282,10 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
   const trafficLightHistories = await getTrafficLightHistoriesByMember([memberId]);
   const trafficLightHistory = trafficLightHistories.get(memberId) ?? [];
   const latestPalmsSnapshots = await getLatestPalmsSnapshotsByMember([memberId]);
+  const [availableRoles, pastRolesByMember] = await Promise.all([
+    getAvailableRoles(),
+    getPastRolesByMember([memberId]),
+  ]);
   const enrichedCycles = ((cycles ?? []) as RenewalCycleRow[]).map((row) =>
     enrichCycle({ ...row, members: member as Member }, today, trafficLightHistory),
   );
@@ -245,6 +295,8 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     currentCycle: enrichedCycles[0] ?? null,
     cycles: enrichedCycles,
     latestPalmsSnapshot: latestPalmsSnapshots.get(memberId) ?? null,
+    availableRoles,
+    pastRoles: pastRolesByMember.get(memberId) ?? [],
   };
 }
 

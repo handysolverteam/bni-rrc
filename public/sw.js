@@ -1,4 +1,4 @@
-const CACHE_NAME = "bni-rrc-v1";
+const CACHE_NAME = "bni-rrc-v2";
 const APP_SHELL = [
   "/",
   "/import",

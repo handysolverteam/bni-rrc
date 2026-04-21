@@ -1,0 +1,3 @@
+{
+  "/api/members/[id]/past-roles/route": "app/api/members/[id]/past-roles/route.js"
+}

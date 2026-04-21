@@ -75,6 +75,27 @@ export type MemberPalmsSnapshot = {
   import_batch_id: string | null;
 };
 
+export type ChapterRole = {
+  id: string;
+  name: string;
+  normalized_name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MemberPastRole = {
+  id: string;
+  member_id: string;
+  role_id: string;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type MemberPastRoleEntry = MemberPastRole & {
+  role: ChapterRole;
+};
+
 export type RenewalCycle = {
   id: string;
   member_id: string;

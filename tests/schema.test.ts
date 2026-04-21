@@ -26,4 +26,14 @@ describe("schema", () => {
     expect(sql).toContain("alter table public.members");
     expect(sql).toContain("add column member_since date");
   });
+
+  it("stores reusable chapter roles and ordered member past roles", () => {
+    const sql = readFileSync("supabase/migrations/007_member_past_roles.sql", "utf8").toLowerCase();
+
+    expect(sql).toContain("create table public.chapter_roles");
+    expect(sql).toContain("unique (normalized_name)");
+    expect(sql).toContain("create table public.member_past_roles");
+    expect(sql).toContain("unique (member_id, role_id)");
+    expect(sql).toContain("display_order integer not null default 0");
+  });
 });
