@@ -32,10 +32,17 @@ function formatTrafficLightSummary(history: MemberTrafficLight[]): string | null
 
   return recentTrafficLights
     .map((trafficLight) => {
-      const color = `${trafficLight.color[0].toUpperCase()}${trafficLight.color.slice(1)}`;
-      return `${formatDisplayMonth(trafficLight.report_month).split(" ")[0]} ${color}`;
+      const colorEmoji =
+        trafficLight.color === "green"
+          ? "🟢"
+          : trafficLight.color === "yellow"
+            ? "🟡"
+            : trafficLight.color === "red"
+              ? "🔴"
+              : "⚪";
+      return `${formatDisplayMonth(trafficLight.report_month).split(" ")[0]} ${colorEmoji}`;
     })
-    .join(", ");
+    .join(" | ");
 }
 
 export function buildMemberAchievementShareText({
@@ -55,26 +62,38 @@ export function buildMemberAchievementShareText({
   achievements: MemberAchievements;
   trafficLightHistory: MemberTrafficLight[];
 }): string {
+  const roleText =
+    roles.length > 0 ? roles.map((pastRole) => pastRole.role.name).join(", ") : "No past roles added yet";
+  const joiningText = joiningDateLabel === "-" ? "Joining date not set" : joiningDateLabel;
   const lines = [
-    `Celebrating ${memberName}`,
-    `Roles held: ${roles.length > 0 ? roles.map((pastRole) => pastRole.role.name).join(", ") : "No past roles added yet"}`,
-    renewalLabel,
-    `Member for ${tenureLabel} | Joined ${joiningDateLabel === "-" ? "Joining date not set" : joiningDateLabel}`,
-    `Referrals given: ${formatNumber(achievements.referrals.givenTotal)} | 1-to-1s: ${formatNumber(achievements.oneToOnes)}`,
-    `TYFCB: ${formatCurrency(achievements.tyfcb)} | Visitors: ${formatNumber(achievements.visitors)}`,
-    `Absences: ${formatNumber(achievements.attendance.absences)}`,
+    `🌟 Celebrating ${memberName} 🌟`,
+    "",
+    `🏆 Roles held: ${roleText}`,
+    `🔄 ${renewalLabel}`,
+    `📅 Member for ${tenureLabel} | Joined ${joiningText}`,
+    "",
+    `🤝 Referrals given: ${formatNumber(achievements.referrals.givenTotal)}`,
+    `👥 1-to-1s done: ${formatNumber(achievements.oneToOnes)}`,
+    `💰 TYFCB: ${formatCurrency(achievements.tyfcb)}`,
+    `🙌 Visitors: ${formatNumber(achievements.visitors)}`,
+    `✅ Absences: ${formatNumber(achievements.attendance.absences)}`,
   ];
 
   const trafficLightSummary = formatTrafficLightSummary(trafficLightHistory);
 
   if (trafficLightSummary) {
-    lines.push(`Last 6 months: ${trafficLightSummary}`);
+    lines.push("");
+    lines.push("🚦 Last 6 months:");
+    lines.push(trafficLightSummary);
   }
 
   if (achievements.source === "palms" && achievements.reportTo) {
-    lines.push(`Achievements updated till ${formatDisplayDate(achievements.reportTo)}`);
+    lines.push("");
+    lines.push(`📌 Achievements updated till ${formatDisplayDate(achievements.reportTo)}`);
   }
+
+  lines.push("");
+  lines.push("👏 Congratulations on the consistency and contribution!");
 
   return lines.join("\n");
 }
-

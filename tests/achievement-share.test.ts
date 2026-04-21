@@ -100,15 +100,19 @@ describe("buildMemberAchievementShareText", () => {
       trafficLightHistory: trafficLights,
     });
 
-    expect(text).toContain("Celebrating Viraj Bansal");
-    expect(text).toContain("Roles held: President");
-    expect(text).toContain("Renewing for 2026");
-    expect(text).toContain("Member for 15 years 1 month | Joined 1 Mar 2011");
-    expect(text).toContain("Referrals given: 30 | 1-to-1s: 60");
-    expect(text).toContain("TYFCB: ₹7,00,000 | Visitors: 50");
-    expect(text).toContain("Absences: 2");
-    expect(text).toContain("Last 6 months: Mar Green, Feb Yellow");
-    expect(text).toContain("Achievements updated till 31 Mar 2026");
+    expect(text).toContain("🌟 Celebrating Viraj Bansal 🌟");
+    expect(text).toContain("🏆 Roles held: President");
+    expect(text).toContain("🔄 Renewing for 2026");
+    expect(text).toContain("📅 Member for 15 years 1 month | Joined 1 Mar 2011");
+    expect(text).toContain("🤝 Referrals given: 30");
+    expect(text).toContain("👥 1-to-1s done: 60");
+    expect(text).toContain("💰 TYFCB: ₹7,00,000");
+    expect(text).toContain("🙌 Visitors: 50");
+    expect(text).toContain("✅ Absences: 2");
+    expect(text).toContain("🚦 Last 6 months:");
+    expect(text).toContain("Mar 🟢 | Feb 🟡");
+    expect(text).toContain("📌 Achievements updated till 31 Mar 2026");
+    expect(text).toContain("👏 Congratulations on the consistency and contribution!");
   });
 
   it("falls back gracefully when roles, tenure, and history are missing", () => {
@@ -122,10 +126,10 @@ describe("buildMemberAchievementShareText", () => {
       trafficLightHistory: [],
     });
 
-    expect(text).toContain("Roles held: No past roles added yet");
-    expect(text).toContain("Renewal year unavailable");
-    expect(text).toContain("Member for Tenure not set | Joined Joining date not set");
-    expect(text).toContain("Absences: 0");
+    expect(text).toContain("🏆 Roles held: No past roles added yet");
+    expect(text).toContain("🔄 Renewal year unavailable");
+    expect(text).toContain("📅 Member for Tenure not set | Joined Joining date not set");
+    expect(text).toContain("✅ Absences: 0");
     expect(text).not.toContain("Last 6 months:");
   });
 
@@ -140,8 +144,10 @@ describe("buildMemberAchievementShareText", () => {
       trafficLightHistory: trafficLights,
     });
 
-    expect(text).toContain("Referrals given: 8 | 1-to-1s: -");
-    expect(text).toContain("TYFCB: ₹3,000 | Visitors: 3");
+    expect(text).toContain("🤝 Referrals given: 8");
+    expect(text).toContain("👥 1-to-1s done: -");
+    expect(text).toContain("💰 TYFCB: ₹3,000");
+    expect(text).toContain("🙌 Visitors: 3");
     expect(text).not.toContain("Achievements updated till");
   });
 });

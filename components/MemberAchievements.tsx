@@ -124,10 +124,10 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
-                    Shareable summary
+                    Share On WhatsApp
                   </p>
                   <p className="mt-1 text-sm text-[var(--muted)]">
-                    Short WhatsApp-ready recognition text for easy forwarding.
+                    More lively recognition text with emojis, ready to preview and forward.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -152,9 +152,16 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
                 </div>
               </div>
               {isPreviewOpen ? (
-                <pre className="mt-4 whitespace-pre-wrap rounded-md border border-[var(--line)] bg-white p-3 text-sm leading-6 text-[var(--ink)]">
-                  {shareText}
-                </pre>
+                <div className="mt-4 max-w-2xl rounded-[1.5rem] border border-[#d7e6d1] bg-[#eaf7dc] p-3">
+                  <div className="rounded-[1.25rem] bg-white px-4 py-3 shadow-sm ring-1 ring-[#dfe7d8]">
+                    <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                      WhatsApp preview
+                    </p>
+                    <pre className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--ink)]">
+                      {shareText}
+                    </pre>
+                  </div>
+                </div>
               ) : null}
             </div>
             <p className="mt-3 text-sm text-[var(--muted)]">
