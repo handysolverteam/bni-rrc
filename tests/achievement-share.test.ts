@@ -113,6 +113,7 @@ describe("buildMemberAchievementShareText", () => {
     expect(text).toContain("Mar 🟢 | Feb 🟡");
     expect(text).toContain("📌 Achievements updated till 31 Mar 2026");
     expect(text).toContain("👏 Congratulations on the consistency and contribution!");
+    expect(text).toContain("Regards,\nRetention and Renewal Coordinators\nTeam Moneyfestation");
   });
 
   it("falls back gracefully when roles, tenure, and history are missing", () => {
@@ -130,6 +131,7 @@ describe("buildMemberAchievementShareText", () => {
     expect(text).toContain("🔄 Renewal year unavailable");
     expect(text).toContain("📅 Member for Tenure not set | Joined Joining date not set");
     expect(text).toContain("✅ Absences: 0");
+    expect(text).toContain("Team Moneyfestation");
     expect(text).not.toContain("Last 6 months:");
   });
 

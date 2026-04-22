@@ -94,6 +94,10 @@ export function buildMemberAchievementShareText({
 
   lines.push("");
   lines.push("👏 Congratulations on the consistency and contribution!");
+  lines.push("");
+  lines.push("Regards,");
+  lines.push("Retention and Renewal Coordinators");
+  lines.push("Team Moneyfestation");
 
   return lines.join("\n");
 }
