@@ -39,6 +39,23 @@ export default function MemberPerformance({
 }) {
   const trafficLightPerformance = buildPastYearPerformance(detail.currentCycle?.traffic_light_history ?? []);
   const palmsPerformance = buildMonthlyPalmsPerformance(detail.palmsSnapshots);
+  const palmsRange =
+    palmsPerformance.monthlySnapshots.length > 0
+      ? `${formatDisplayDate(palmsPerformance.monthlySnapshots[0].report_from)} to ${formatDisplayDate(
+          palmsPerformance.monthlySnapshots[palmsPerformance.monthlySnapshots.length - 1].report_to,
+        )}`
+      : null;
+  const trafficLightRange =
+    trafficLightPerformance.history.length > 0
+      ? `${formatDisplayMonth(
+          trafficLightPerformance.history[0].report_window_start ??
+            trafficLightPerformance.history[0].report_window_end ??
+            trafficLightPerformance.history[0].report_month,
+        )} to ${formatDisplayMonth(
+          trafficLightPerformance.history[trafficLightPerformance.history.length - 1].report_window_end ??
+            trafficLightPerformance.history[trafficLightPerformance.history.length - 1].report_month,
+        )}`
+      : null;
 
   return (
     <div className="space-y-6">
@@ -66,6 +83,9 @@ export default function MemberPerformance({
                 {palmsPerformance.monthsCovered} month{palmsPerformance.monthsCovered === 1 ? "" : "s"}
               </p>
               <p className="mt-1 text-sm text-[var(--muted)]">Exact monthly PALMS files used for yearly totals</p>
+              {palmsRange ? (
+                <p className="mt-1 text-sm font-medium text-[var(--accent)]">{palmsRange}</p>
+              ) : null}
             </div>
           </div>
           <MemberSectionNav active="performance" memberId={detail.member.id} />
@@ -86,6 +106,9 @@ export default function MemberPerformance({
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-md border border-[var(--line)] bg-white p-4">
           <h2 className="text-xl font-semibold tracking-normal">Traffic-light score trend</h2>
+          {trafficLightRange ? (
+            <p className="mt-1 text-sm text-[var(--muted)]">Date range: {trafficLightRange}</p>
+          ) : null}
           {trafficLightPerformance.snapshotsCovered > 0 ? (
             <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
               <MetricItem label="Average" value={formatNumber(trafficLightPerformance.scores.average)} />
@@ -101,6 +124,9 @@ export default function MemberPerformance({
 
         <div className="rounded-md border border-[var(--line)] bg-white p-4">
           <h2 className="text-xl font-semibold tracking-normal">Monthly PALMS totals</h2>
+          {palmsRange ? (
+            <p className="mt-1 text-sm text-[var(--muted)]">Date range: {palmsRange}</p>
+          ) : null}
           {palmsPerformance.monthsCovered > 0 ? (
             <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <MetricItem label="Late" value={formatNumber(palmsPerformance.totals.late)} />
@@ -123,6 +149,9 @@ export default function MemberPerformance({
             <p className="mt-1 text-sm text-[var(--muted)]">
               These PDF rows are rolling report windows. Score and light are useful for trend, but counts are not treated as exact one-month values.
             </p>
+            {trafficLightRange ? (
+              <p className="mt-1 text-sm text-[var(--muted)]">Date range: {trafficLightRange}</p>
+            ) : null}
           </div>
         </div>
         {trafficLightPerformance.history.length > 0 ? (
@@ -169,6 +198,9 @@ export default function MemberPerformance({
 
       <section className="rounded-md border border-[var(--line)] bg-white p-4">
         <h2 className="text-xl font-semibold tracking-normal">Exact monthly PALMS breakdown</h2>
+        {palmsRange ? (
+          <p className="mt-1 text-sm text-[var(--muted)]">Date range: {palmsRange}</p>
+        ) : null}
         {palmsPerformance.monthlySnapshots.length > 0 ? (
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
