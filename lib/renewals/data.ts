@@ -108,6 +108,35 @@ async function getLatestPalmsSnapshotsByMember(
   return snapshots;
 }
 
+async function getPalmsSnapshotsByMember(
+  memberIds: string[],
+): Promise<Map<string, MemberPalmsSnapshot[]>> {
+  if (memberIds.length === 0) {
+    return new Map();
+  }
+
+  const supabase = getServiceSupabase();
+  const { data, error } = await supabase
+    .from("member_palms_snapshots")
+    .select("*")
+    .in("member_id", memberIds)
+    .order("report_to", { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const grouped = new Map<string, MemberPalmsSnapshot[]>();
+
+  for (const row of (data ?? []) as MemberPalmsSnapshot[]) {
+    const snapshots = grouped.get(row.member_id) ?? [];
+    snapshots.push(row);
+    grouped.set(row.member_id, snapshots);
+  }
+
+  return grouped;
+}
+
 async function getAvailableRoles(): Promise<ChapterRole[]> {
   const supabase = getServiceSupabase();
   const { data, error } = await supabase
@@ -287,6 +316,7 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
   );
   const trafficLightHistory = trafficLightHistories.get(memberId) ?? [];
   const latestPalmsSnapshots = await getLatestPalmsSnapshotsByMember([memberId]);
+  const palmsSnapshotsByMember = await getPalmsSnapshotsByMember([memberId]);
   const [availableRoles, pastRolesByMember] = await Promise.all([
     getAvailableRoles(),
     getPastRolesByMember([memberId]),
@@ -300,6 +330,7 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     currentCycle: enrichedCycles[0] ?? null,
     cycles: enrichedCycles,
     latestPalmsSnapshot: latestPalmsSnapshots.get(memberId) ?? null,
+    palmsSnapshots: palmsSnapshotsByMember.get(memberId) ?? [],
     availableRoles,
     pastRoles: pastRolesByMember.get(memberId) ?? [],
   };

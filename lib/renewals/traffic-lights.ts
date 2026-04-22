@@ -20,6 +20,8 @@ export type ParsedTrafficLightRow = {
 
 export type ParsedTrafficLightReport = {
   reportMonth: string;
+  reportWindowStart: string;
+  reportWindowEnd: string;
   rows: ParsedTrafficLightRow[];
   hasTyfcb: boolean;
 };
@@ -66,13 +68,24 @@ function parseMonthToken(month: string, year: string): string {
 }
 
 export function parseTrafficLightReportMonth(text: string): string {
-  const match = text.match(/MEMBER TRAFFIC LIGHTS[\s\S]*?\bTO\s+([A-Z]{3})-(\d{2})/i);
+  return parseTrafficLightReportWindow(text).reportWindowEnd;
+}
 
-  if (!match) {
+export function parseTrafficLightReportWindow(text: string): {
+  reportWindowStart: string;
+  reportWindowEnd: string;
+} {
+  const match = text.match(/MEMBER TRAFFIC LIGHTS[\s\S]*?\bTO\s+([A-Z]{3})-(\d{2})/i);
+  const startMatch = text.match(/MEMBER TRAFFIC LIGHTS[\s\S]*?\bFOR\s+([A-Z]{3})-(\d{2})\s+TO\s+([A-Z]{3})-(\d{2})/i);
+
+  if (!match || !startMatch) {
     throw new Error("Traffic-light report month was not found.");
   }
 
-  return parseMonthToken(match[1], match[2]);
+  return {
+    reportWindowStart: parseMonthToken(startMatch[1], startMatch[2]),
+    reportWindowEnd: parseMonthToken(match[1], match[2]),
+  };
 }
 
 function parseNumberToken(value: string): number {
@@ -162,7 +175,8 @@ export function parseTrafficLightReport(
   }
 
   const hasTyfcb = /\bTYFCB\b/.test(text);
-  const reportMonth = reportMonthOverride || parseTrafficLightReportMonth(text);
+  const reportWindow = parseTrafficLightReportWindow(text);
+  const reportMonth = reportMonthOverride || reportWindow.reportWindowEnd;
   const rows = text
     .split(/\r?\n/)
     .map((line) => parseTrafficLightRow(line, hasTyfcb))
@@ -174,6 +188,8 @@ export function parseTrafficLightReport(
 
   return {
     reportMonth,
+    reportWindowStart: reportWindow.reportWindowStart,
+    reportWindowEnd: reportMonthOverride || reportWindow.reportWindowEnd,
     rows,
     hasTyfcb,
   };

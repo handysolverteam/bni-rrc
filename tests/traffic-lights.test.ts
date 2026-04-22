@@ -3,6 +3,7 @@ import {
   getTrafficLightColor,
   parseTrafficLightReport,
   parseTrafficLightReportMonth,
+  parseTrafficLightReportWindow,
 } from "../lib/renewals/traffic-lights";
 
 const januaryText = `First Name Last Name P A L M S RGT RRT V T TYFCB Trainings WEEK Total
@@ -24,6 +25,17 @@ describe("traffic-light parsing", () => {
     expect(parseTrafficLightReportMonth(marchText)).toBe("2026-03-01");
   });
 
+  it("extracts the full report window from the footer", () => {
+    expect(parseTrafficLightReportWindow(januaryText)).toEqual({
+      reportWindowStart: "2025-08-01",
+      reportWindowEnd: "2026-01-01",
+    });
+    expect(parseTrafficLightReportWindow(marchText)).toEqual({
+      reportWindowStart: "2025-10-01",
+      reportWindowEnd: "2026-03-01",
+    });
+  });
+
   it("maps score bands to traffic-light colors", () => {
     expect(getTrafficLightColor(70)).toBe("green");
     expect(getTrafficLightColor(50)).toBe("yellow");
@@ -36,6 +48,8 @@ describe("traffic-light parsing", () => {
 
     expect(parsed.hasTyfcb).toBe(true);
     expect(parsed.reportMonth).toBe("2026-01-01");
+    expect(parsed.reportWindowStart).toBe("2025-08-01");
+    expect(parsed.reportWindowEnd).toBe("2026-01-01");
     expect(parsed.rows).toHaveLength(4);
     expect(parsed.rows[0]).toMatchObject({
       name: "Neraj K Anand",
@@ -58,6 +72,8 @@ describe("traffic-light parsing", () => {
 
     expect(parsed.hasTyfcb).toBe(false);
     expect(parsed.reportMonth).toBe("2026-03-01");
+    expect(parsed.reportWindowStart).toBe("2025-10-01");
+    expect(parsed.reportWindowEnd).toBe("2026-03-01");
     expect(parsed.rows).toHaveLength(3);
     expect(parsed.rows[1]).toMatchObject({
       name: "Dr. Hemesh Thakur",
@@ -70,6 +86,9 @@ describe("traffic-light parsing", () => {
   });
 
   it("allows an explicit report month override", () => {
-    expect(parseTrafficLightReport(marchText, "2026-02-01").reportMonth).toBe("2026-02-01");
+    const parsed = parseTrafficLightReport(marchText, "2026-02-01");
+    expect(parsed.reportMonth).toBe("2026-02-01");
+    expect(parsed.reportWindowStart).toBe("2025-10-01");
+    expect(parsed.reportWindowEnd).toBe("2026-02-01");
   });
 });

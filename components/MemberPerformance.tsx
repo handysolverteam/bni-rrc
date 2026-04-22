@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { formatDisplayMonth } from "@/lib/date-format";
+import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
+import { buildMonthlyPalmsPerformance } from "@/lib/renewals/palms-monthly-performance";
 import { buildPastYearPerformance } from "@/lib/renewals/past-year-performance";
-import type { DashboardCycle, Member } from "@/lib/types";
+import type { DashboardCycle, Member, MemberPalmsSnapshot } from "@/lib/types";
 import MemberSectionNav from "./MemberSectionNav";
 import { formatTrafficLightColor, trafficLightDotClasses } from "./TrafficLightBadge";
 
@@ -33,9 +34,11 @@ export default function MemberPerformance({
   detail: {
     member: Member;
     currentCycle: DashboardCycle | null;
+    palmsSnapshots: MemberPalmsSnapshot[];
   };
 }) {
-  const performance = buildPastYearPerformance(detail.currentCycle?.traffic_light_history ?? []);
+  const trafficLightPerformance = buildPastYearPerformance(detail.currentCycle?.traffic_light_history ?? []);
+  const palmsPerformance = buildMonthlyPalmsPerformance(detail.palmsSnapshots);
 
   return (
     <div className="space-y-6">
@@ -58,11 +61,11 @@ export default function MemberPerformance({
               <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.report_role || "No report role"}</p>
             </div>
             <div className="rounded-md bg-[#eef1ea] px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Coverage</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Monthly PALMS coverage</p>
               <p className="mt-1 text-2xl font-semibold tracking-normal text-[var(--accent)]">
-                {performance.monthsCovered} month{performance.monthsCovered === 1 ? "" : "s"}
+                {palmsPerformance.monthsCovered} month{palmsPerformance.monthsCovered === 1 ? "" : "s"}
               </p>
-              <p className="mt-1 text-sm text-[var(--muted)]">Latest imported monthly traffic-light records</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">Exact monthly PALMS files used for yearly totals</p>
             </div>
           </div>
           <MemberSectionNav active="performance" memberId={detail.member.id} />
@@ -70,66 +73,81 @@ export default function MemberPerformance({
       </section>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Referrals given" value={formatNumber(performance.totals.referralsGiven)} />
-        <StatCard label="Referrals received" value={formatNumber(performance.totals.referralsReceived)} />
-        <StatCard label="Visitors" value={formatNumber(performance.totals.visitors)} />
-        <StatCard label="TYFCB" value={formatCurrency(performance.totals.tyfcb)} />
-        <StatCard label="Presents" value={formatNumber(performance.totals.presents)} />
-        <StatCard label="Absences" value={formatNumber(performance.totals.absences)} />
-        <StatCard label="Testimonials" value={formatNumber(performance.totals.testimonials)} />
-        <StatCard label="Trainings" value={formatNumber(performance.totals.trainings)} />
+        <StatCard label="Referrals given" value={formatNumber(palmsPerformance.totals.referralsGiven)} />
+        <StatCard label="Referrals received" value={formatNumber(palmsPerformance.totals.referralsReceived)} />
+        <StatCard label="Visitors" value={formatNumber(palmsPerformance.totals.visitors)} />
+        <StatCard label="TYFCB" value={formatCurrency(palmsPerformance.totals.tyfcb)} />
+        <StatCard label="Presents" value={formatNumber(palmsPerformance.totals.presents)} />
+        <StatCard label="Absences" value={formatNumber(palmsPerformance.totals.absences)} />
+        <StatCard label="1-to-1s" value={formatNumber(palmsPerformance.totals.oneToOnes)} />
+        <StatCard label="CEU" value={formatNumber(palmsPerformance.totals.ceu)} />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-md border border-[var(--line)] bg-white p-4">
-          <h2 className="text-xl font-semibold tracking-normal">Score summary</h2>
-          {performance.monthsCovered > 0 ? (
+          <h2 className="text-xl font-semibold tracking-normal">Traffic-light score trend</h2>
+          {trafficLightPerformance.snapshotsCovered > 0 ? (
             <dl className="mt-4 grid grid-cols-3 gap-3 text-sm">
-              <MetricItem label="Average" value={formatNumber(performance.scores.average)} />
-              <MetricItem label="Best" value={formatNumber(performance.scores.best)} />
-              <MetricItem label="Worst" value={formatNumber(performance.scores.worst)} />
+              <MetricItem label="Average" value={formatNumber(trafficLightPerformance.scores.average)} />
+              <MetricItem label="Best" value={formatNumber(trafficLightPerformance.scores.best)} />
+              <MetricItem label="Worst" value={formatNumber(trafficLightPerformance.scores.worst)} />
             </dl>
           ) : (
             <p className="mt-3 text-sm text-[var(--muted)]">
-              No monthly history imported yet for yearly statistics.
+              No traffic-light PDF snapshots imported yet.
             </p>
           )}
         </div>
 
         <div className="rounded-md border border-[var(--line)] bg-white p-4">
-          <h2 className="text-xl font-semibold tracking-normal">Attendance details</h2>
-          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <MetricItem label="Late" value={formatNumber(performance.totals.late)} />
-            <MetricItem label="Medical" value={formatNumber(performance.totals.medical)} />
-            <MetricItem label="Substitute" value={formatNumber(performance.totals.substitute)} />
-          </dl>
+          <h2 className="text-xl font-semibold tracking-normal">Monthly PALMS totals</h2>
+          {palmsPerformance.monthsCovered > 0 ? (
+            <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+              <MetricItem label="Late" value={formatNumber(palmsPerformance.totals.late)} />
+              <MetricItem label="Medical" value={formatNumber(palmsPerformance.totals.medical)} />
+              <MetricItem label="Substitute" value={formatNumber(palmsPerformance.totals.substitute)} />
+              <MetricItem label="Trainings" value={formatNumber(palmsPerformance.totals.trainings)} />
+            </dl>
+          ) : (
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              No exact monthly PALMS files imported yet, so yearly totals are unavailable.
+            </p>
+          )}
         </div>
       </section>
 
       <section className="rounded-md border border-[var(--line)] bg-white p-4">
-        <h2 className="text-xl font-semibold tracking-normal">Month-wise trend</h2>
-        {performance.history.length > 0 ? (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-normal">Rolling traffic-light snapshots</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              These PDF rows are rolling report windows. Score and light are useful for trend, but counts are not treated as exact one-month values.
+            </p>
+          </div>
+        </div>
+        {trafficLightPerformance.history.length > 0 ? (
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-[var(--line)] text-[var(--muted)]">
-                  <th className="py-2 pr-3 font-medium">Month</th>
+                  <th className="py-2 pr-3 font-medium">Window</th>
                   <th className="py-2 pr-3 font-medium">Score</th>
                   <th className="py-2 pr-3 font-medium">Light</th>
-                  <th className="py-2 pr-3 font-medium">P</th>
-                  <th className="py-2 pr-3 font-medium">A</th>
-                  <th className="py-2 pr-3 font-medium">Referrals</th>
-                  <th className="py-2 pr-3 font-medium">Visitors</th>
-                  <th className="py-2 pr-3 font-medium">TYFCB</th>
                 </tr>
               </thead>
               <tbody>
-                {performance.history.map((trafficLight) => (
+                {trafficLightPerformance.history.map((trafficLight) => (
                   <tr
                     key={`${trafficLight.member_id}-${trafficLight.report_month}`}
                     className="border-b border-[var(--line)] last:border-0"
                   >
-                    <td className="py-2 pr-3">{formatDisplayMonth(trafficLight.report_month)}</td>
+                    <td className="py-2 pr-3">
+                      {trafficLight.report_window_start
+                        ? `${formatDisplayMonth(trafficLight.report_window_start)} to ${formatDisplayMonth(
+                            trafficLight.report_window_end ?? trafficLight.report_month,
+                          )}`
+                        : formatDisplayMonth(trafficLight.report_window_end ?? trafficLight.report_month)}
+                    </td>
                     <td className="py-2 pr-3">{trafficLight.score}</td>
                     <td className="py-2 pr-3">
                       <span className="inline-flex items-center gap-2">
@@ -137,11 +155,6 @@ export default function MemberPerformance({
                         {formatTrafficLightColor(trafficLight.color)}
                       </span>
                     </td>
-                    <td className="py-2 pr-3">{trafficLight.present_count}</td>
-                    <td className="py-2 pr-3">{trafficLight.absent_count}</td>
-                    <td className="py-2 pr-3">{trafficLight.referrals_given}</td>
-                    <td className="py-2 pr-3">{trafficLight.visitors}</td>
-                    <td className="py-2 pr-3">{formatCurrency(trafficLight.tyfcb)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -149,7 +162,47 @@ export default function MemberPerformance({
           </div>
         ) : (
           <p className="mt-3 text-sm text-[var(--muted)]">
-            No monthly history imported yet for yearly statistics.
+            No traffic-light PDF snapshots imported yet.
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-md border border-[var(--line)] bg-white p-4">
+        <h2 className="text-xl font-semibold tracking-normal">Exact monthly PALMS breakdown</h2>
+        {palmsPerformance.monthlySnapshots.length > 0 ? (
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--line)] text-[var(--muted)]">
+                  <th className="py-2 pr-3 font-medium">Month</th>
+                  <th className="py-2 pr-3 font-medium">P</th>
+                  <th className="py-2 pr-3 font-medium">A</th>
+                  <th className="py-2 pr-3 font-medium">Referrals</th>
+                  <th className="py-2 pr-3 font-medium">Visitors</th>
+                  <th className="py-2 pr-3 font-medium">1-to-1s</th>
+                  <th className="py-2 pr-3 font-medium">TYFCB</th>
+                </tr>
+              </thead>
+              <tbody>
+                {palmsPerformance.monthlySnapshots.map((snapshot) => (
+                  <tr key={snapshot.id} className="border-b border-[var(--line)] last:border-0">
+                    <td className="py-2 pr-3">{formatDisplayMonth(snapshot.report_to)}</td>
+                    <td className="py-2 pr-3">{snapshot.present_count}</td>
+                    <td className="py-2 pr-3">{snapshot.absent_count}</td>
+                    <td className="py-2 pr-3">
+                      {snapshot.referrals_given_inside + snapshot.referrals_given_outside}
+                    </td>
+                    <td className="py-2 pr-3">{snapshot.visitors}</td>
+                    <td className="py-2 pr-3">{formatNumber(snapshot.one_to_ones)}</td>
+                    <td className="py-2 pr-3">{formatCurrency(snapshot.tyfcb)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            Upload exact monthly PALMS `.xls` files to see true month-by-month yearly totals here.
           </p>
         )}
       </section>

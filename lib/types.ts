@@ -34,6 +34,8 @@ export type MemberTrafficLight = {
   id: string;
   member_id: string;
   report_month: string;
+  report_window_start: string | null;
+  report_window_end: string | null;
   score: number;
   color: TrafficLightColor;
   present_count: number;

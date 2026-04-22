@@ -1,0 +1,65 @@
+import { describe, expect, it } from "vitest";
+import { buildMonthlyPalmsPerformance, isExactMonthlyPalmsSnapshot } from "../lib/renewals/palms-monthly-performance";
+import type { MemberPalmsSnapshot } from "../lib/types";
+
+function snapshot(reportFrom: string, reportTo: string, overrides: Partial<MemberPalmsSnapshot> = {}): MemberPalmsSnapshot {
+  return {
+    id: `${reportFrom}-${reportTo}`,
+    member_id: "member-1",
+    chapter_name: "Influencers",
+    report_from: reportFrom,
+    report_to: reportTo,
+    run_at: null,
+    present_count: 4,
+    absent_count: 1,
+    late_count: 0,
+    medical_count: 0,
+    substitute_count: 0,
+    referrals_given_inside: 2,
+    referrals_given_outside: 1,
+    referrals_received_inside: 3,
+    referrals_received_outside: 1,
+    visitors: 2,
+    one_to_ones: 5,
+    tyfcb: 1000,
+    ceu: 1,
+    trainings: 1,
+    import_batch_id: null,
+    ...overrides,
+  };
+}
+
+describe("monthly PALMS performance", () => {
+  it("recognizes exact monthly PALMS windows", () => {
+    expect(isExactMonthlyPalmsSnapshot(snapshot("2026-03-01", "2026-03-31"))).toBe(true);
+    expect(isExactMonthlyPalmsSnapshot(snapshot("2025-10-01", "2026-03-31"))).toBe(false);
+  });
+
+  it("builds exact yearly totals from the latest 12 monthly PALMS files", () => {
+    const snapshots = [
+      snapshot("2025-01-01", "2025-01-31"),
+      snapshot("2025-02-01", "2025-02-28"),
+      snapshot("2025-03-01", "2025-03-31"),
+      snapshot("2025-04-01", "2025-04-30"),
+      snapshot("2025-05-01", "2025-05-31"),
+      snapshot("2025-06-01", "2025-06-30"),
+      snapshot("2025-07-01", "2025-07-31"),
+      snapshot("2025-08-01", "2025-08-31"),
+      snapshot("2025-09-01", "2025-09-30"),
+      snapshot("2025-10-01", "2025-10-31"),
+      snapshot("2025-11-01", "2025-11-30"),
+      snapshot("2025-12-01", "2025-12-31"),
+      snapshot("2026-01-01", "2026-01-31"),
+    ];
+
+    const result = buildMonthlyPalmsPerformance(snapshots);
+
+    expect(result.monthsCovered).toBe(12);
+    expect(result.monthlySnapshots[0].report_to).toBe("2025-02-28");
+    expect(result.monthlySnapshots[11].report_to).toBe("2026-01-31");
+    expect(result.totals.presents).toBe(48);
+    expect(result.totals.referralsGiven).toBe(36);
+    expect(result.totals.oneToOnes).toBe(60);
+    expect(result.totals.tyfcb).toBe(12000);
+  });
+});

@@ -7,6 +7,8 @@ function trafficLight(reportMonth: string, overrides: Partial<MemberTrafficLight
     id: reportMonth,
     member_id: "member-1",
     report_month: reportMonth,
+    report_window_start: null,
+    report_window_end: reportMonth,
     score: 50,
     color: "yellow",
     present_count: 4,
@@ -49,13 +51,10 @@ describe("buildPastYearPerformance", () => {
 
     const result = buildPastYearPerformance(history);
 
-    expect(result.monthsCovered).toBe(12);
+    expect(result.snapshotsCovered).toBe(12);
     expect(result.history).toHaveLength(12);
     expect(result.history[0].report_month).toBe("2025-02-01");
     expect(result.history[11].report_month).toBe("2026-01-01");
-    expect(result.totals.presents).toBe(48);
-    expect(result.totals.referralsGiven).toBe(24);
-    expect(result.totals.tyfcb).toBe(12000);
     expect(result.scores.best).toBe(52);
     expect(result.scores.worst).toBe(41);
   });
@@ -63,8 +62,7 @@ describe("buildPastYearPerformance", () => {
   it("returns an empty summary when no history exists", () => {
     const result = buildPastYearPerformance([]);
 
-    expect(result.monthsCovered).toBe(0);
-    expect(result.totals.tyfcb).toBeNull();
+    expect(result.snapshotsCovered).toBe(0);
     expect(result.scores.average).toBeNull();
   });
 });

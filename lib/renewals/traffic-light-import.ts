@@ -58,6 +58,7 @@ export async function importTrafficLightReport(
       filename,
       report_date: parsed.reportMonth,
       source_type: "traffic_lights_pdf",
+      source_report_from: parsed.reportWindowStart,
       source_report_to: parsed.reportMonth,
       status: "pending",
     })
@@ -107,6 +108,8 @@ export async function importTrafficLightReport(
       records.push({
         member_id: matches[0].id,
         report_month: parsed.reportMonth,
+        report_window_start: parsed.reportWindowStart,
+        report_window_end: parsed.reportWindowEnd,
         score: row.score,
         color: row.color,
         present_count: row.presentCount,

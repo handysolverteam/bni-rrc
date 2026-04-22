@@ -10,7 +10,9 @@ const sampleReport =
   "C:\\Users\\rahul\\Downloads\\Chapter_Summary_PALMS_Report_21-04-2026_10-59_AM.xls";
 
 describe("parsePalmsChapterSummaryReport", () => {
-  it("extracts report metadata and member rows from the provided sample report", () => {
+  const sampleReportTest = existsSync(sampleReport) ? it : it.skip;
+
+  sampleReportTest("extracts report metadata and member rows from the provided sample report", () => {
     expect(existsSync(sampleReport)).toBe(true);
 
     const parsed = parsePalmsChapterSummaryReport(readFileSync(sampleReport, "utf8"));
@@ -63,7 +65,7 @@ describe("parsePalmsChapterSummaryReport", () => {
     expect(matched[0].matches).toHaveLength(1);
   });
 
-  it("builds a stable report identity from the chapter and report window", () => {
+  sampleReportTest("builds a stable report identity from the chapter and report window", () => {
     const parsed = parsePalmsChapterSummaryReport(readFileSync(sampleReport, "utf8"));
 
     expect(buildPalmsReportIdentity(parsed)).toBe("Influencers|2015-10-01|2026-03-31");

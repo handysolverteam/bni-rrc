@@ -46,4 +46,12 @@ describe("schema", () => {
     expect(sql).toContain("add column source_report_from date");
     expect(sql).toContain("add column source_report_to date");
   });
+
+  it("stores traffic-light report windows separately from the ending month", () => {
+    const sql = readFileSync("supabase/migrations/009_traffic_light_report_windows.sql", "utf8").toLowerCase();
+
+    expect(sql).toContain("alter table public.member_traffic_lights");
+    expect(sql).toContain("add column report_window_start date");
+    expect(sql).toContain("add column report_window_end date");
+  });
 });

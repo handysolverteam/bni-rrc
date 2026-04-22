@@ -14,6 +14,8 @@ function trafficLight(
     id: `${memberId}-${reportMonth}`,
     member_id: memberId,
     report_month: reportMonth,
+    report_window_start: null,
+    report_window_end: reportMonth,
     score,
     color: score >= 70 ? "green" : score >= 50 ? "yellow" : score >= 30 ? "red" : "grey",
     present_count: 0,
