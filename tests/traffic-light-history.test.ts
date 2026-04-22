@@ -73,4 +73,17 @@ describe("traffic-light history", () => {
       ]).map((item) => item.report_month),
     ).toEqual(["2026-01-01", "2026-02-01", "2026-03-01"]);
   });
+
+  it("can keep all records when no limit is requested", () => {
+    const grouped = groupTrafficLightHistoryByMember(
+      [
+        trafficLight("member-1", "2026-01-01", 40),
+        trafficLight("member-1", "2026-02-01", 45),
+        trafficLight("member-1", "2026-03-01", 50),
+      ],
+      null,
+    );
+
+    expect(grouped.get("member-1")).toHaveLength(3);
+  });
 });

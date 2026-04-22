@@ -14,6 +14,7 @@ import type {
 import { calculateStage, getDerivedRenewalDates, isWithinRenewalWorkWindow } from "./stage";
 import { isActiveRenewalTaskType } from "./task-types";
 import {
+  PAST_YEAR_TRAFFIC_LIGHT_LIMIT,
   groupTrafficLightHistoryByMember,
 } from "./traffic-light-history";
 
@@ -58,6 +59,7 @@ export function enrichCycle(
 
 async function getTrafficLightHistoriesByMember(
   memberIds: string[],
+  limit?: number | null,
 ): Promise<Map<string, MemberTrafficLight[]>> {
   if (memberIds.length === 0) {
     return new Map();
@@ -74,7 +76,7 @@ async function getTrafficLightHistoriesByMember(
     throw error;
   }
 
-  return groupTrafficLightHistoryByMember((data ?? []) as MemberTrafficLight[]);
+  return groupTrafficLightHistoryByMember((data ?? []) as MemberTrafficLight[], limit);
 }
 
 async function getLatestPalmsSnapshotsByMember(
@@ -279,7 +281,10 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     throw cyclesError;
   }
 
-  const trafficLightHistories = await getTrafficLightHistoriesByMember([memberId]);
+  const trafficLightHistories = await getTrafficLightHistoriesByMember(
+    [memberId],
+    PAST_YEAR_TRAFFIC_LIGHT_LIMIT,
+  );
   const trafficLightHistory = trafficLightHistories.get(memberId) ?? [];
   const latestPalmsSnapshots = await getLatestPalmsSnapshotsByMember([memberId]);
   const [availableRoles, pastRolesByMember] = await Promise.all([

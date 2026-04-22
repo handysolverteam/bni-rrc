@@ -36,4 +36,14 @@ describe("schema", () => {
     expect(sql).toContain("unique (member_id, role_id)");
     expect(sql).toContain("display_order integer not null default 0");
   });
+
+  it("tracks import source metadata separately on import batches", () => {
+    const sql = readFileSync("supabase/migrations/008_import_batches_source_metadata.sql", "utf8").toLowerCase();
+
+    expect(sql).toContain("alter table public.import_batches");
+    expect(sql).toContain("add column source_type text not null default 'unknown'");
+    expect(sql).toContain("'palms_chapter_summary'");
+    expect(sql).toContain("add column source_report_from date");
+    expect(sql).toContain("add column source_report_to date");
+  });
 });

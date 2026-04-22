@@ -14,6 +14,7 @@ import type {
   MemberPastRoleEntry,
 } from "@/lib/types";
 import PastRolesSection from "./PastRolesSection";
+import MemberSectionNav from "./MemberSectionNav";
 import TrafficLightBadge, { trafficLightDotClasses } from "./TrafficLightBadge";
 
 type MemberAchievementsPayload = {
@@ -184,6 +185,9 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
               <p className="mt-2 text-sm text-[var(--muted)]">No current traffic-light score</p>
             )}
           </div>
+        </div>
+        <div className="mt-4">
+          <MemberSectionNav active="achievements" memberId={detail.member.id} />
         </div>
       </section>
 

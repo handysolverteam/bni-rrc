@@ -59,6 +59,12 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
             >
               View achievements
             </a>
+            <a
+              className="mt-2 inline-flex text-sm font-medium text-[var(--accent)] hover:underline"
+              href={`/members/${detail.member.id}/performance`}
+            >
+              View past year performance
+            </a>
             <div className="mt-4 rounded-md bg-[#eef1ea] px-4 py-3">
               <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
                 Renewal date

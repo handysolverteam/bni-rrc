@@ -30,6 +30,7 @@ export async function importMembershipDuesReport(
     .insert({
       filename,
       report_date: parsed.reportDate,
+      source_type: "membership_dues_xls",
       status: "pending",
     })
     .select("id")

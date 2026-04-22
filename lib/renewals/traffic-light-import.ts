@@ -57,6 +57,8 @@ export async function importTrafficLightReport(
     .insert({
       filename,
       report_date: parsed.reportMonth,
+      source_type: "traffic_lights_pdf",
+      source_report_to: parsed.reportMonth,
       status: "pending",
     })
     .select("id")

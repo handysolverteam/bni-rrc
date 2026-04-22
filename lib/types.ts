@@ -159,6 +159,13 @@ export type AchievementMemberListItem = {
   latestPalmsSnapshot: MemberPalmsSnapshot | null;
 };
 
+export type ImportSourceType =
+  | "unknown"
+  | "membership_dues_xls"
+  | "traffic_lights_pdf"
+  | "palms_chapter_summary"
+  | "membership_length_pdf";
+
 export type ImportMemberRow = {
   name: string;
   industry: string;

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  buildPalmsReportIdentity,
   matchPalmsRowMembers,
   parsePalmsChapterSummaryReport,
 } from "../lib/renewals/palms-import";
@@ -60,5 +61,11 @@ describe("parsePalmsChapterSummaryReport", () => {
     const matched = matchPalmsRowMembers(rows, [{ name: "  garima   agarwal " }]);
 
     expect(matched[0].matches).toHaveLength(1);
+  });
+
+  it("builds a stable report identity from the chapter and report window", () => {
+    const parsed = parsePalmsChapterSummaryReport(readFileSync(sampleReport, "utf8"));
+
+    expect(buildPalmsReportIdentity(parsed)).toBe("Influencers|2015-10-01|2026-03-31");
   });
 });

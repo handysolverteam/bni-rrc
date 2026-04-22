@@ -33,6 +33,14 @@ export type ParsedPalmsReport = {
   rows: ParsedPalmsRow[];
 };
 
+export function buildPalmsReportIdentity(report: Pick<ParsedPalmsReport, "chapterName" | "reportFrom" | "reportTo">): string {
+  return [
+    report.chapterName ?? "Unknown chapter",
+    report.reportFrom ?? "unknown-from",
+    report.reportTo ?? "unknown-to",
+  ].join("|");
+}
+
 const requiredHeaders = [
   "First Name",
   "Last Name",
