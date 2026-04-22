@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
 import { buildMonthlyPalmsPerformance } from "@/lib/renewals/palms-monthly-performance";
 import { buildPastYearPerformance } from "@/lib/renewals/past-year-performance";
+import { buildMemberPerformanceShareText } from "@/lib/renewals/performance-share";
 import type { DashboardCycle, Member, MemberPalmsSnapshot } from "@/lib/types";
 import MemberSectionNav from "./MemberSectionNav";
 import { formatTrafficLightColor, trafficLightDotClasses } from "./TrafficLightBadge";
@@ -37,6 +39,8 @@ export default function MemberPerformance({
     palmsSnapshots: MemberPalmsSnapshot[];
   };
 }) {
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const trafficLightPerformance = buildPastYearPerformance(detail.currentCycle?.traffic_light_history ?? []);
   const palmsPerformance = buildMonthlyPalmsPerformance(detail.palmsSnapshots);
   const palmsRange =
@@ -56,6 +60,22 @@ export default function MemberPerformance({
             trafficLightPerformance.history[trafficLightPerformance.history.length - 1].report_month,
         )}`
       : null;
+  const shareText = buildMemberPerformanceShareText({
+    memberName: detail.member.name,
+    palmsPerformance,
+    palmsRange,
+    trafficLightPerformance,
+    trafficLightRange,
+  });
+
+  async function handleCopyMessage() {
+    try {
+      await navigator.clipboard.writeText(shareText);
+      setCopyState("copied");
+    } catch {
+      setCopyState("error");
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -87,6 +107,50 @@ export default function MemberPerformance({
                 <p className="mt-1 text-sm font-medium text-[var(--accent)]">{palmsRange}</p>
               ) : null}
             </div>
+          </div>
+          <div className="rounded-md border border-[var(--line)] bg-[#f7f7f4] p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                  Share On WhatsApp
+                </p>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Ready-to-share past year performance summary with yearly totals and traffic-light trend.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white"
+                  onClick={handleCopyMessage}
+                  type="button"
+                >
+                  {copyState === "copied"
+                    ? "Copied"
+                    : copyState === "error"
+                      ? "Copy failed"
+                      : "Copy message"}
+                </button>
+                <button
+                  className="rounded-md border border-[var(--line)] bg-white px-4 py-2 text-sm font-medium text-[var(--accent)]"
+                  onClick={() => setIsPreviewOpen((currentValue) => !currentValue)}
+                  type="button"
+                >
+                  {isPreviewOpen ? "Hide preview" : "Preview text"}
+                </button>
+              </div>
+            </div>
+            {isPreviewOpen ? (
+              <div className="mt-4 max-w-2xl rounded-[1.5rem] border border-[#d7e6d1] bg-[#eaf7dc] p-3">
+                <div className="rounded-[1.25rem] bg-white px-4 py-3 shadow-sm ring-1 ring-[#dfe7d8]">
+                  <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                    WhatsApp preview
+                  </p>
+                  <pre className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--ink)]">
+                    {shareText}
+                  </pre>
+                </div>
+              </div>
+            ) : null}
           </div>
           <MemberSectionNav active="performance" memberId={detail.member.id} />
         </div>
