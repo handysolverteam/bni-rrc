@@ -20,6 +20,24 @@ import {
   groupTrafficLightHistoryByMember,
 } from "./traffic-light-history";
 
+function isMissingSponsorAchievementsSchemaError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const maybeError = error as { code?: unknown; message?: unknown; details?: unknown };
+  const code = typeof maybeError.code === "string" ? maybeError.code : "";
+  const message = typeof maybeError.message === "string" ? maybeError.message.toLowerCase() : "";
+  const details = typeof maybeError.details === "string" ? maybeError.details.toLowerCase() : "";
+  const combined = `${message} ${details}`;
+
+  return (
+    code === "42P01" ||
+    combined.includes("member_sponsor_achievements") ||
+    combined.includes("sponsor achievements")
+  );
+}
+
 type RenewalCycleRow = RenewalCycle & {
   members: Member | null;
   renewal_assignments: Array<
@@ -190,27 +208,39 @@ async function getSponsorAchievementsByMember(
     return new Map();
   }
 
-  const supabase = getServiceSupabase();
-  const { data, error } = await supabase
-    .from("member_sponsor_achievements")
-    .select("*")
-    .in("member_id", memberIds)
-    .order("application_date", { ascending: false })
-    .order("sponsored_full_name", { ascending: true });
+  try {
+    const supabase = getServiceSupabase();
+    const { data, error } = await supabase
+      .from("member_sponsor_achievements")
+      .select("*")
+      .in("member_id", memberIds)
+      .order("application_date", { ascending: false })
+      .order("sponsored_full_name", { ascending: true });
 
-  if (error) {
+    if (error) {
+      if (isMissingSponsorAchievementsSchemaError(error)) {
+        return new Map();
+      }
+
+      throw error;
+    }
+
+    const grouped = new Map<string, MemberSponsorAchievement[]>();
+
+    for (const row of (data ?? []) as MemberSponsorAchievement[]) {
+      const achievements = grouped.get(row.member_id) ?? [];
+      achievements.push(row);
+      grouped.set(row.member_id, achievements);
+    }
+
+    return grouped;
+  } catch (error) {
+    if (isMissingSponsorAchievementsSchemaError(error)) {
+      return new Map();
+    }
+
     throw error;
   }
-
-  const grouped = new Map<string, MemberSponsorAchievement[]>();
-
-  for (const row of (data ?? []) as MemberSponsorAchievement[]) {
-    const achievements = grouped.get(row.member_id) ?? [];
-    achievements.push(row);
-    grouped.set(row.member_id, achievements);
-  }
-
-  return grouped;
 }
 
 export async function getDashboardCycles(today = new Date()): Promise<DashboardCycle[]> {
