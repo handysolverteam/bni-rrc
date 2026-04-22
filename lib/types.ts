@@ -77,6 +77,18 @@ export type MemberPalmsSnapshot = {
   import_batch_id: string | null;
 };
 
+export type MemberSponsorAchievement = {
+  id: string;
+  member_id: string;
+  sponsored_first_name: string;
+  sponsored_last_name: string;
+  sponsored_full_name: string;
+  sponsored_region: string | null;
+  sponsored_chapter: string | null;
+  application_date: string;
+  import_batch_id: string | null;
+};
+
 export type ChapterRole = {
   id: string;
   name: string;
@@ -163,12 +175,20 @@ export type AchievementMemberListItem = {
   latestPalmsSnapshot: MemberPalmsSnapshot | null;
 };
 
+export type SponsorAchievementSummary = {
+  lifetimeSponsors: MemberSponsorAchievement[];
+  pastYearSponsors: MemberSponsorAchievement[];
+  lifetimeCount: number;
+  pastYearCount: number;
+};
+
 export type ImportSourceType =
   | "unknown"
   | "membership_dues_xls"
   | "traffic_lights_pdf"
   | "palms_chapter_summary"
-  | "membership_length_pdf";
+  | "membership_length_pdf"
+  | "chapter_sponsor_report";
 
 export type ImportMemberRow = {
   name: string;

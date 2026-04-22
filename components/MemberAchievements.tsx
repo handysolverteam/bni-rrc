@@ -12,6 +12,8 @@ import type {
   Member,
   MemberPalmsSnapshot,
   MemberPastRoleEntry,
+  MemberSponsorAchievement,
+  SponsorAchievementSummary,
 } from "@/lib/types";
 import PastRolesSection from "./PastRolesSection";
 import MemberSectionNav from "./MemberSectionNav";
@@ -23,6 +25,8 @@ type MemberAchievementsPayload = {
   latestPalmsSnapshot: MemberPalmsSnapshot | null;
   availableRoles: ChapterRole[];
   pastRoles: MemberPastRoleEntry[];
+  sponsorAchievements: MemberSponsorAchievement[];
+  sponsorSummary: SponsorAchievementSummary;
 };
 
 function formatNumber(value: number | null): string {
@@ -209,6 +213,34 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
+        <AchievementCard
+          label="Sponsors (lifetime)"
+          value={formatNumber(detail.sponsorSummary.lifetimeCount)}
+          emphasize
+        />
+        <AchievementCard
+          label="Sponsors (past year)"
+          value={formatNumber(detail.sponsorSummary.pastYearCount)}
+        />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-md border border-[var(--line)] bg-white p-4">
+          <h2 className="text-xl font-semibold tracking-normal">Sponsored members lifetime</h2>
+          <SponsorAchievementList
+            emptyMessage="No sponsored members imported for lifetime achievements yet."
+            items={detail.sponsorSummary.lifetimeSponsors}
+          />
+        </div>
+
+        <div className="rounded-md border border-[var(--line)] bg-white p-4">
+          <h2 className="text-xl font-semibold tracking-normal">Sponsored members past year</h2>
+          <SponsorAchievementList
+            emptyMessage="No sponsored members found in the past year."
+            items={detail.sponsorSummary.pastYearSponsors}
+          />
+        </div>
+
         <div className="rounded-md border border-[var(--line)] bg-white p-4 lg:col-span-2">
           <h2 className="text-xl font-semibold tracking-normal">Recent traffic lights</h2>
           {recentTrafficLights.length > 0 ? (
@@ -355,5 +387,37 @@ function MetricGrid({ items }: { items: Array<[string, string]> }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+function SponsorAchievementList({
+  items,
+  emptyMessage,
+}: {
+  items: MemberSponsorAchievement[];
+  emptyMessage: string;
+}) {
+  if (items.length === 0) {
+    return <p className="mt-3 text-sm text-[var(--muted)]">{emptyMessage}</p>;
+  }
+
+  return (
+    <ul className="mt-4 space-y-3">
+      {items.map((item) => (
+        <li
+          key={`${item.member_id}-${item.sponsored_full_name}-${item.application_date}-${item.sponsored_chapter ?? "chapter"}`}
+          className="rounded-md border border-[var(--line)] bg-[#f7f7f4] p-3"
+        >
+          <p className="font-medium text-[var(--accent)]">{item.sponsored_full_name}</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Applied on {formatDisplayDate(item.application_date)}
+          </p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            {item.sponsored_chapter ?? "Unknown chapter"}
+            {item.sponsored_region ? `, ${item.sponsored_region}` : ""}
+          </p>
+        </li>
+      ))}
+    </ul>
   );
 }

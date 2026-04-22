@@ -6,11 +6,13 @@ import type {
   Member,
   MemberPastRoleEntry,
   MemberPalmsSnapshot,
+  MemberSponsorAchievement,
   MemberTrafficLight,
   RenewalAssignment,
   RenewalCycle,
   RenewalTask,
 } from "../types";
+import { buildSponsorAchievementSummary } from "./sponsor-achievements";
 import { calculateStage, getDerivedRenewalDates, isWithinRenewalWorkWindow } from "./stage";
 import { isActiveRenewalTaskType } from "./task-types";
 import {
@@ -181,6 +183,36 @@ async function getPastRolesByMember(
   return grouped;
 }
 
+async function getSponsorAchievementsByMember(
+  memberIds: string[],
+): Promise<Map<string, MemberSponsorAchievement[]>> {
+  if (memberIds.length === 0) {
+    return new Map();
+  }
+
+  const supabase = getServiceSupabase();
+  const { data, error } = await supabase
+    .from("member_sponsor_achievements")
+    .select("*")
+    .in("member_id", memberIds)
+    .order("application_date", { ascending: false })
+    .order("sponsored_full_name", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  const grouped = new Map<string, MemberSponsorAchievement[]>();
+
+  for (const row of (data ?? []) as MemberSponsorAchievement[]) {
+    const achievements = grouped.get(row.member_id) ?? [];
+    achievements.push(row);
+    grouped.set(row.member_id, achievements);
+  }
+
+  return grouped;
+}
+
 export async function getDashboardCycles(today = new Date()): Promise<DashboardCycle[]> {
   const supabase = getServiceSupabase();
   const { data, error } = await supabase
@@ -317,12 +349,17 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
   const trafficLightHistory = trafficLightHistories.get(memberId) ?? [];
   const latestPalmsSnapshots = await getLatestPalmsSnapshotsByMember([memberId]);
   const palmsSnapshotsByMember = await getPalmsSnapshotsByMember([memberId]);
-  const [availableRoles, pastRolesByMember] = await Promise.all([
+  const [availableRoles, pastRolesByMember, sponsorAchievementsByMember] = await Promise.all([
     getAvailableRoles(),
     getPastRolesByMember([memberId]),
+    getSponsorAchievementsByMember([memberId]),
   ]);
   const enrichedCycles = ((cycles ?? []) as RenewalCycleRow[]).map((row) =>
     enrichCycle({ ...row, members: member as Member }, today, trafficLightHistory),
+  );
+  const sponsorSummary = buildSponsorAchievementSummary(
+    sponsorAchievementsByMember.get(memberId) ?? [],
+    today,
   );
 
   return {
@@ -331,6 +368,8 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     cycles: enrichedCycles,
     latestPalmsSnapshot: latestPalmsSnapshots.get(memberId) ?? null,
     palmsSnapshots: palmsSnapshotsByMember.get(memberId) ?? [],
+    sponsorAchievements: sponsorAchievementsByMember.get(memberId) ?? [],
+    sponsorSummary,
     availableRoles,
     pastRoles: pastRolesByMember.get(memberId) ?? [],
   };

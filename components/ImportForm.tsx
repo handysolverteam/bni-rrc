@@ -54,6 +54,9 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
   const [trafficSubmitting, setTrafficSubmitting] = useState(false);
   const [trafficResult, setTrafficResult] = useState<ImportResult | null>(null);
   const [trafficError, setTrafficError] = useState<string | null>(null);
+  const [sponsorSubmitting, setSponsorSubmitting] = useState(false);
+  const [sponsorResult, setSponsorResult] = useState<ImportResult | null>(null);
+  const [sponsorError, setSponsorError] = useState<string | null>(null);
 
   function hasInvalidPalmsFiles(files: QueuedPalmsFile[]): boolean {
     return files.some((file) => file.previewError !== null);
@@ -275,6 +278,46 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
       </form>
 
       <PalmsCoverageSection coverage={coverage} />
+
+      <form
+        onSubmit={(event) =>
+          submitImport(
+            event,
+            "/api/import/sponsors",
+            setSponsorSubmitting,
+            setSponsorResult,
+            setSponsorError,
+          )
+        }
+        className="space-y-4 rounded-md border border-[var(--line)] bg-white p-4"
+      >
+        <div>
+          <p className="text-sm font-semibold">Sponsor report `.xls`</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Upload the chapter sponsor report to refresh lifetime and past-year sponsor
+            achievements for imported members.
+          </p>
+        </div>
+        <label className="block">
+          <span className="text-sm font-medium">Sponsor report `.xls`</span>
+          <input
+            className="focus-ring mt-2 block w-full rounded-md border border-[var(--line)] p-2 text-sm"
+            name="file"
+            type="file"
+            accept=".xls"
+            required
+          />
+        </label>
+        <button
+          className="focus-ring min-h-11 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] disabled:opacity-60"
+          disabled={sponsorSubmitting}
+          type="submit"
+        >
+          {sponsorSubmitting ? "Importing..." : "Import sponsor report"}
+        </button>
+
+        <ImportFeedback result={sponsorResult} error={sponsorError} />
+      </form>
 
       <form
         onSubmit={(event) =>

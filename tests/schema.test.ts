@@ -47,6 +47,25 @@ describe("schema", () => {
     expect(sql).toContain("add column source_report_to date");
   });
 
+  it("stores sponsor achievements separately from member profile sponsor text", () => {
+    const sql = readFileSync("supabase/migrations/011_member_sponsor_achievements.sql", "utf8").toLowerCase();
+
+    expect(sql).toContain("create table public.member_sponsor_achievements");
+    expect(sql).toContain("sponsored_full_name text not null");
+    expect(sql).toContain("application_date date not null");
+    expect(sql).toContain("unique (member_id, sponsored_full_name, application_date, sponsored_chapter)");
+  });
+
+  it("allows sponsor imports as a tracked import batch source type", () => {
+    const sql = readFileSync(
+      "supabase/migrations/012_import_batches_sponsor_source_type.sql",
+      "utf8",
+    ).toLowerCase();
+
+    expect(sql).toContain("drop constraint if exists import_batches_source_type_check");
+    expect(sql).toContain("'chapter_sponsor_report'");
+  });
+
   it("stores traffic-light report windows separately from the ending month", () => {
     const sql = readFileSync("supabase/migrations/009_traffic_light_report_windows.sql", "utf8").toLowerCase();
 
