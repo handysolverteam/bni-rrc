@@ -44,6 +44,11 @@ export default function MemberCard({ cycle }: { cycle: DashboardCycle }) {
       <div>
         <h3 className="font-semibold">{cycle.member.name}</h3>
         <p className="text-sm text-[var(--muted)]">{cycle.member.industry || "No industry"}</p>
+        {cycle.is_two_year_renewal ? (
+          <p className="mt-1 text-xs font-medium uppercase tracking-wide text-[var(--accent)]">
+            2-year renewal term
+          </p>
+        ) : null}
       </div>
 
       {cycle.latest_traffic_light ? (
@@ -67,6 +72,11 @@ export default function MemberCard({ cycle }: { cycle: DashboardCycle }) {
       <p className="mt-4 text-sm text-[var(--muted)]">
         Renewal {formatDisplayDate(cycle.renewal_date)} - {cycle.open_task_count} open
       </p>
+      {cycle.is_two_year_renewal && cycle.reported_due_date ? (
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Reported due {formatDisplayDate(cycle.reported_due_date)}
+        </p>
+      ) : null}
     </Link>
   );
 }

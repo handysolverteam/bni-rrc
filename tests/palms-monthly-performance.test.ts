@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildMonthlyPalmsPerformance, isExactMonthlyPalmsSnapshot } from "../lib/renewals/palms-monthly-performance";
+import {
+  buildMonthlyPalmsPerformance,
+  getMissingPalmsMonths,
+  isExactMonthlyPalmsSnapshot,
+  isExactMonthlyPalmsWindow,
+} from "../lib/renewals/palms-monthly-performance";
 import type { MemberPalmsSnapshot } from "../lib/types";
 
 function snapshot(reportFrom: string, reportTo: string, overrides: Partial<MemberPalmsSnapshot> = {}): MemberPalmsSnapshot {
@@ -33,6 +38,18 @@ describe("monthly PALMS performance", () => {
   it("recognizes exact monthly PALMS windows", () => {
     expect(isExactMonthlyPalmsSnapshot(snapshot("2026-03-01", "2026-03-31"))).toBe(true);
     expect(isExactMonthlyPalmsSnapshot(snapshot("2025-10-01", "2026-03-31"))).toBe(false);
+    expect(
+      isExactMonthlyPalmsWindow({
+        report_from: "2026-04-01",
+        report_to: "2026-04-30",
+      }),
+    ).toBe(true);
+    expect(
+      isExactMonthlyPalmsWindow({
+        report_from: "2026-04-02",
+        report_to: "2026-04-30",
+      }),
+    ).toBe(false);
   });
 
   it("builds exact yearly totals from the latest 12 monthly PALMS files", () => {
@@ -61,5 +78,33 @@ describe("monthly PALMS performance", () => {
     expect(result.totals.referralsGiven).toBe(36);
     expect(result.totals.oneToOnes).toBe(60);
     expect(result.totals.tyfcb).toBe(12000);
+  });
+
+  it("detects missing months between uploaded monthly PALMS windows", () => {
+    const missingMonths = getMissingPalmsMonths([
+      {
+        chapterName: "Influencers",
+        reportFrom: "2025-10-01",
+        reportTo: "2025-10-31",
+        filename: "oct.xls",
+        createdAt: "2026-04-22T00:00:00.000Z",
+      },
+      {
+        chapterName: "Influencers",
+        reportFrom: "2025-11-01",
+        reportTo: "2025-11-30",
+        filename: "nov.xls",
+        createdAt: "2026-04-22T00:00:00.000Z",
+      },
+      {
+        chapterName: "Influencers",
+        reportFrom: "2026-01-01",
+        reportTo: "2026-01-31",
+        filename: "jan.xls",
+        createdAt: "2026-04-22T00:00:00.000Z",
+      },
+    ]);
+
+    expect(missingMonths).toEqual(["2025-12-01"]);
   });
 });

@@ -19,15 +19,33 @@ export type MonthlyPalmsPerformance = {
   };
 };
 
+export type MonthlyPalmsWindowLike = {
+  report_from: string;
+  report_to: string;
+};
+
+export type PalmsMonthlyCoverageEntry = {
+  chapterName: string | null;
+  reportFrom: string;
+  reportTo: string;
+  filename: string | null;
+  createdAt: string | null;
+};
+
 function getMonthEnd(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
 }
 
-export function isExactMonthlyPalmsSnapshot(snapshot: MemberPalmsSnapshot): boolean {
-  const from = new Date(`${snapshot.report_from}T00:00:00.000Z`);
-  const to = new Date(`${snapshot.report_to}T00:00:00.000Z`);
+function parseDateOnly(date: string): Date | null {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
-  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+export function isExactMonthlyPalmsWindow(window: MonthlyPalmsWindowLike): boolean {
+  const from = parseDateOnly(window.report_from);
+  const to = parseDateOnly(window.report_to);
+
+  if (!from || !to) {
     return false;
   }
 
@@ -37,6 +55,49 @@ export function isExactMonthlyPalmsSnapshot(snapshot: MemberPalmsSnapshot): bool
     from.getUTCDate() === 1 &&
     to.getUTCDate() === getMonthEnd(from).getUTCDate()
   );
+}
+
+export function isExactMonthlyPalmsSnapshot(snapshot: MemberPalmsSnapshot): boolean {
+  return isExactMonthlyPalmsWindow(snapshot);
+}
+
+function addMonths(date: Date, count: number): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + count, 1));
+}
+
+function formatMonthStart(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-01`;
+}
+
+export function getMissingPalmsMonths(entries: PalmsMonthlyCoverageEntry[]): string[] {
+  const monthlyEntries = entries
+    .filter((entry) => isExactMonthlyPalmsWindow({ report_from: entry.reportFrom, report_to: entry.reportTo }))
+    .sort((left, right) => left.reportFrom.localeCompare(right.reportFrom));
+
+  if (monthlyEntries.length < 2) {
+    return [];
+  }
+
+  const existingMonths = new Set(monthlyEntries.map((entry) => entry.reportFrom));
+  const missingMonths: string[] = [];
+  let cursor = parseDateOnly(monthlyEntries[0].reportFrom);
+  const end = parseDateOnly(monthlyEntries[monthlyEntries.length - 1].reportFrom);
+
+  if (!cursor || !end) {
+    return [];
+  }
+
+  while (cursor.getTime() <= end.getTime()) {
+    const month = formatMonthStart(cursor);
+
+    if (!existingMonths.has(month)) {
+      missingMonths.push(month);
+    }
+
+    cursor = addMonths(cursor, 1);
+  }
+
+  return missingMonths;
 }
 
 export function buildMonthlyPalmsPerformance(

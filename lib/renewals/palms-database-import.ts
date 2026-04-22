@@ -6,6 +6,7 @@ import {
   parsePalmsChapterSummaryReport,
   type ParsedPalmsReport,
 } from "./palms-import";
+import { isExactMonthlyPalmsWindow } from "./palms-monthly-performance";
 
 export type ImportResult = {
   batchId: string | null;
@@ -69,6 +70,13 @@ async function importParsedPalmsChapterSummaryReport(
 
   if (!parsed.reportTo) {
     throw new Error("PALMS report end date was not found.");
+  }
+
+  if (
+    !parsed.reportFrom ||
+    !isExactMonthlyPalmsWindow({ report_from: parsed.reportFrom, report_to: parsed.reportTo })
+  ) {
+    throw new Error("This PALMS file is not a single calendar month.");
   }
 
   const reportIdentity = buildPalmsReportIdentity(parsed);

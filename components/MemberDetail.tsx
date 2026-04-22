@@ -72,6 +72,14 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
               <p className="mt-1 text-3xl font-semibold tracking-normal text-[var(--accent)]">
                 {formatDisplayDate(cycle.renewal_date)}
               </p>
+              {cycle.is_two_year_renewal && cycle.reported_due_date ? (
+                <div className="mt-3 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">
+                  <p className="font-medium text-[var(--accent)]">2-year renewal term</p>
+                  <p className="mt-1 text-[var(--muted)]">
+                    Reported due date {formatDisplayDate(cycle.reported_due_date)}
+                  </p>
+                </div>
+              ) : null}
             </div>
           </div>
           <select
@@ -171,6 +179,7 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
               <tr className="border-b border-[var(--line)]">
                 <th className="py-2 pr-3">Year</th>
                 <th className="py-2 pr-3">Date</th>
+                <th className="py-2 pr-3">Reported due</th>
                 <th className="py-2 pr-3">Status</th>
                 <th className="py-2 pr-3">Stage</th>
               </tr>
@@ -180,6 +189,9 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
                 <tr key={item.id} className="border-b border-[var(--line)] last:border-0">
                   <td className="py-2 pr-3">{item.renewal_year}</td>
                   <td className="py-2 pr-3">{formatDisplayDate(item.renewal_date)}</td>
+                  <td className="py-2 pr-3">
+                    {item.is_two_year_renewal ? formatDisplayDate(item.reported_due_date) : "-"}
+                  </td>
                   <td className="py-2 pr-3">{item.status}</td>
                   <td className="py-2 pr-3">{item.stage ?? "Not in active workflow"}</td>
                 </tr>

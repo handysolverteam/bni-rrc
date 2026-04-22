@@ -103,9 +103,11 @@ export type RenewalCycle = {
   member_id: string;
   renewal_year: number;
   renewal_date: string;
+  reported_due_date: string | null;
   status: RenewalStatus;
   source_membership_status: string | null;
   auto_renewal_enabled: boolean;
+  is_two_year_renewal: boolean;
   last_followup_date: string | null;
   next_followup_date: string | null;
   online_form_filled: boolean;

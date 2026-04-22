@@ -1,6 +1,11 @@
 import ImportForm from "@/components/ImportForm";
+import { getPalmsMonthlyCoverage } from "@/lib/renewals/import-coverage";
 
-export default function ImportPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ImportPage() {
+  const coverage = await getPalmsMonthlyCoverage();
+
   return (
     <div className="max-w-3xl space-y-6">
       <div>
@@ -11,7 +16,7 @@ export default function ImportPage() {
           scores, and PALMS chapter summaries for lifetime achievement totals.
         </p>
       </div>
-      <ImportForm />
+      <ImportForm coverage={coverage} />
     </div>
   );
 }

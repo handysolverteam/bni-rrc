@@ -9,8 +9,58 @@ export type ImportResult = {
   errors: string[];
 };
 
+type ImportedRenewalCycleInput = {
+  renewalYear: number;
+  renewalDate: string;
+  reportedDueDate: string | null;
+  isTwoYearRenewal: boolean;
+};
+
 function renewalYearFromDate(date: string): number {
   return Number(date.slice(0, 4));
+}
+
+function parseDateParts(date: string): { year: number; month: number; day: number } {
+  return {
+    year: Number(date.slice(0, 4)),
+    month: Number(date.slice(5, 7)),
+    day: Number(date.slice(8, 10)),
+  };
+}
+
+function toDateOnly(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export function getImportReferenceYear(reportDate: string | null, today = new Date()): number {
+  if (reportDate) {
+    return renewalYearFromDate(reportDate);
+  }
+
+  return today.getUTCFullYear();
+}
+
+export function deriveImportedRenewalCycle(
+  dueDate: string,
+  referenceYear: number,
+): ImportedRenewalCycleInput {
+  const dueParts = parseDateParts(dueDate);
+
+  if (dueParts.year > referenceYear) {
+    return {
+      renewalYear: referenceYear,
+      renewalDate: toDateOnly(referenceYear, dueParts.month, dueParts.day),
+      reportedDueDate: dueDate,
+      isTwoYearRenewal: true,
+    };
+  }
+
+  return {
+    renewalYear: dueParts.year,
+    renewalDate: dueDate,
+    reportedDueDate: null,
+    isTwoYearRenewal: false,
+  };
 }
 
 function memberKey(member: Pick<Member, "name" | "industry">): string {
@@ -23,6 +73,7 @@ export async function importMembershipDuesReport(
 ): Promise<ImportResult> {
   const supabase = getServiceSupabase();
   const parsed = parseMembershipDuesReport(xml);
+  const referenceYear = getImportReferenceYear(parsed.reportDate);
   const errors: string[] = [];
 
   const { data: batch, error: batchError } = await supabase
@@ -59,7 +110,7 @@ export async function importMembershipDuesReport(
     for (const row of parsed.rows) {
       try {
         const member = await upsertMember(row, membersByKey);
-        await upsertRenewalCycle(member.id, row);
+        await upsertRenewalCycle(member.id, row, referenceYear);
         importedCount += 1;
       } catch (error) {
         skippedCount += 1;
@@ -144,29 +195,62 @@ async function upsertMember(
   return data as Member;
 }
 
-async function upsertRenewalCycle(memberId: string, row: ImportMemberRow): Promise<RenewalCycle> {
+async function upsertRenewalCycle(
+  memberId: string,
+  row: ImportMemberRow,
+  referenceYear: number,
+): Promise<RenewalCycle> {
   const supabase = getServiceSupabase();
-  const renewalYear = renewalYearFromDate(row.dueDate);
+  const importedCycle = deriveImportedRenewalCycle(row.dueDate, referenceYear);
   const { data: existing, error: selectError } = await supabase
     .from("renewal_cycles")
     .select("*")
     .eq("member_id", memberId)
-    .eq("renewal_year", renewalYear)
+    .eq("renewal_year", importedCycle.renewalYear)
     .maybeSingle();
 
   if (selectError) {
     throw selectError;
   }
 
+  const legacyFutureCycle =
+    importedCycle.isTwoYearRenewal && !existing
+      ? await findLegacyFutureCycle(memberId, row.dueDate)
+      : null;
+
   if (existing) {
     const { data, error } = await supabase
       .from("renewal_cycles")
       .update({
-        renewal_date: row.dueDate,
+        renewal_date: importedCycle.renewalDate,
+        reported_due_date: importedCycle.reportedDueDate,
         source_membership_status: row.membershipStatus,
         auto_renewal_enabled: row.autoRenewalEnabled,
+        is_two_year_renewal: importedCycle.isTwoYearRenewal,
       })
       .eq("id", existing.id)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return data as RenewalCycle;
+  }
+
+  if (legacyFutureCycle) {
+    const { data, error } = await supabase
+      .from("renewal_cycles")
+      .update({
+        renewal_year: importedCycle.renewalYear,
+        renewal_date: importedCycle.renewalDate,
+        reported_due_date: importedCycle.reportedDueDate,
+        source_membership_status: row.membershipStatus,
+        auto_renewal_enabled: row.autoRenewalEnabled,
+        is_two_year_renewal: importedCycle.isTwoYearRenewal,
+      })
+      .eq("id", legacyFutureCycle.id)
       .select("*")
       .single();
 
@@ -181,10 +265,12 @@ async function upsertRenewalCycle(memberId: string, row: ImportMemberRow): Promi
     .from("renewal_cycles")
     .insert({
       member_id: memberId,
-      renewal_year: renewalYear,
-      renewal_date: row.dueDate,
+      renewal_year: importedCycle.renewalYear,
+      renewal_date: importedCycle.renewalDate,
+      reported_due_date: importedCycle.reportedDueDate,
       source_membership_status: row.membershipStatus,
       auto_renewal_enabled: row.autoRenewalEnabled,
+      is_two_year_renewal: importedCycle.isTwoYearRenewal,
     })
     .select("*")
     .single();
@@ -194,4 +280,25 @@ async function upsertRenewalCycle(memberId: string, row: ImportMemberRow): Promi
   }
 
   return data as RenewalCycle;
+}
+
+async function findLegacyFutureCycle(
+  memberId: string,
+  reportedDueDate: string,
+): Promise<RenewalCycle | null> {
+  const supabase = getServiceSupabase();
+  const { data, error } = await supabase
+    .from("renewal_cycles")
+    .select("*")
+    .eq("member_id", memberId)
+    .eq("renewal_year", renewalYearFromDate(reportedDueDate))
+    .eq("renewal_date", reportedDueDate)
+    .is("reported_due_date", null)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as RenewalCycle | null) ?? null;
 }

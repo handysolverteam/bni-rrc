@@ -54,4 +54,12 @@ describe("schema", () => {
     expect(sql).toContain("add column report_window_start date");
     expect(sql).toContain("add column report_window_end date");
   });
+
+  it("stores annual renewal workflow separately from the imported term date", () => {
+    const sql = readFileSync("supabase/migrations/010_two_year_renewal_terms.sql", "utf8").toLowerCase();
+
+    expect(sql).toContain("alter table public.renewal_cycles");
+    expect(sql).toContain("add column reported_due_date date");
+    expect(sql).toContain("add column is_two_year_renewal boolean not null default false");
+  });
 });

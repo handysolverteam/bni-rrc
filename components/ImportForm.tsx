@@ -2,8 +2,11 @@
 
 import type { DragEvent, FormEvent } from "react";
 import { useRef, useState } from "react";
-import { formatDisplayDate } from "@/lib/date-format";
+import { useRouter } from "next/navigation";
+import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
+import type { PalmsMonthlyCoverage } from "@/lib/renewals/import-coverage";
 import { parsePalmsChapterSummaryReport } from "@/lib/renewals/palms-import";
+import { isExactMonthlyPalmsWindow } from "@/lib/renewals/palms-monthly-performance";
 
 type ImportResult = {
   importedCount: number;
@@ -38,7 +41,8 @@ type QueuedPalmsFile = {
   previewError: string | null;
 };
 
-export default function ImportForm() {
+export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverage }) {
+  const router = useRouter();
   const palmsInputRef = useRef<HTMLInputElement | null>(null);
   const [queuedPalmsFiles, setQueuedPalmsFiles] = useState<QueuedPalmsFile[]>([]);
   const [palmsSubmitting, setPalmsSubmitting] = useState(false);
@@ -50,6 +54,10 @@ export default function ImportForm() {
   const [trafficSubmitting, setTrafficSubmitting] = useState(false);
   const [trafficResult, setTrafficResult] = useState<ImportResult | null>(null);
   const [trafficError, setTrafficError] = useState<string | null>(null);
+
+  function hasInvalidPalmsFiles(files: QueuedPalmsFile[]): boolean {
+    return files.some((file) => file.previewError !== null);
+  }
 
   async function submitImport(
     event: FormEvent<HTMLFormElement>,
@@ -89,13 +97,21 @@ export default function ImportForm() {
       nextFiles.map(async (file) => {
         try {
           const parsed = parsePalmsChapterSummaryReport(await file.text());
+          const isMonthly =
+            parsed.reportFrom && parsed.reportTo
+              ? isExactMonthlyPalmsWindow({
+                  report_from: parsed.reportFrom,
+                  report_to: parsed.reportTo,
+                })
+              : false;
+
           return {
             id: `${file.name}-${file.lastModified}`,
             file,
             chapterName: parsed.chapterName,
             reportFrom: parsed.reportFrom,
             reportTo: parsed.reportTo,
-            previewError: null,
+            previewError: isMonthly ? null : "This PALMS file is not a single calendar month.",
           } satisfies QueuedPalmsFile;
         } catch (error) {
           return {
@@ -137,6 +153,12 @@ export default function ImportForm() {
       return;
     }
 
+    if (hasInvalidPalmsFiles(queuedPalmsFiles)) {
+      setPalmsSubmitting(false);
+      setPalmsError("Remove invalid PALMS files before importing.");
+      return;
+    }
+
     const formData = new FormData();
 
     for (const item of queuedPalmsFiles) {
@@ -158,6 +180,7 @@ export default function ImportForm() {
 
     setPalmsResult(payload);
     setQueuedPalmsFiles([]);
+    router.refresh();
 
     if (palmsInputRef.current) {
       palmsInputRef.current.value = "";
@@ -240,7 +263,9 @@ export default function ImportForm() {
         ) : null}
         <button
           className="focus-ring min-h-11 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] disabled:opacity-60"
-          disabled={palmsSubmitting || queuedPalmsFiles.length === 0}
+          disabled={
+            palmsSubmitting || queuedPalmsFiles.length === 0 || hasInvalidPalmsFiles(queuedPalmsFiles)
+          }
           type="submit"
         >
           {palmsSubmitting ? "Importing..." : "Import PALMS summaries"}
@@ -248,6 +273,8 @@ export default function ImportForm() {
 
         <PalmsImportFeedback result={palmsResult} error={palmsError} />
       </form>
+
+      <PalmsCoverageSection coverage={coverage} />
 
       <form
         onSubmit={(event) =>
@@ -329,6 +356,80 @@ export default function ImportForm() {
         <ImportFeedback result={trafficResult} error={trafficError} />
       </form>
     </div>
+  );
+}
+
+function PalmsCoverageSection({ coverage }: { coverage: PalmsMonthlyCoverage }) {
+  return (
+    <section className="rounded-md border border-[var(--line)] bg-white p-4">
+      <div>
+        <p className="text-sm font-semibold">Monthly PALMS coverage</p>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          Uploaded months appear here so missing months can be backfilled individually.
+        </p>
+      </div>
+
+      {coverage.uploadedMonths.length > 0 ? (
+        <div className="mt-4">
+          <p className="text-sm font-medium">Uploaded</p>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {coverage.uploadedMonths.map((month) => (
+              <li
+                key={`${month.chapterName ?? "chapter"}-${month.reportFrom}-${month.reportTo}`}
+                className="rounded-full border border-[var(--line)] bg-[#f7f7f4] px-3 py-1 text-sm"
+              >
+                {formatDisplayMonth(month.reportFrom)}
+              </li>
+            ))}
+          </ul>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-[var(--line)] text-[var(--muted)]">
+                  <th className="py-2 pr-3 font-medium">Month</th>
+                  <th className="py-2 pr-3 font-medium">Chapter</th>
+                  <th className="py-2 pr-3 font-medium">Filename</th>
+                  <th className="py-2 pr-3 font-medium">Imported on</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coverage.uploadedMonths.map((month) => (
+                  <tr
+                    key={`${month.chapterName ?? "chapter"}-${month.reportFrom}-${month.reportTo}-row`}
+                    className="border-b border-[var(--line)] last:border-0"
+                  >
+                    <td className="py-2 pr-3">{formatDisplayMonth(month.reportFrom)}</td>
+                    <td className="py-2 pr-3">{month.chapterName ?? "Unknown chapter"}</td>
+                    <td className="py-2 pr-3">{month.filename ?? "-"}</td>
+                    <td className="py-2 pr-3">{formatDisplayDate(month.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-[var(--muted)]">No monthly PALMS files have been uploaded yet.</p>
+      )}
+
+      <div className="mt-4">
+        <p className="text-sm font-medium">Missing</p>
+        {coverage.missingMonths.length > 0 ? (
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {coverage.missingMonths.map((month) => (
+              <li
+                key={month}
+                className="rounded-full border border-[#d88b86] bg-[#fff4f3] px-3 py-1 text-sm text-[#a13c34]"
+              >
+                {formatDisplayMonth(month)}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-[var(--muted)]">No missing months detected in the current uploaded range.</p>
+        )}
+      </div>
+    </section>
   );
 }
 
