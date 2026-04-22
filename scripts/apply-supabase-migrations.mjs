@@ -21,9 +21,10 @@ if (shouldSkip) {
 const dbUrl = process.env.SUPABASE_DB_URL;
 
 if (!dbUrl) {
-  fail(
-    "SUPABASE_DB_URL is required to auto-apply Supabase migrations during deploy.",
+  log(
+    "Skipping Supabase migrations because SUPABASE_DB_URL is not configured.",
   );
+  process.exit(0);
 }
 
 log("Applying Supabase migrations with `supabase db push`...");
