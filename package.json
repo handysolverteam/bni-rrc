@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run --pool=threads",
-    "migrate:deploy": "node scripts/apply-supabase-migrations.mjs"
+    "migrate:deploy": "node scripts/apply-supabase-migrations.mjs",
+    "backfill:two-year-renewals": "node scripts/backfill-two-year-renewals.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.0",
