@@ -273,6 +273,7 @@ export default function MemberPerformance({
                   <th className="py-2 pr-3 font-medium">Month</th>
                   <th className="py-2 pr-3 font-medium">P</th>
                   <th className="py-2 pr-3 font-medium">A</th>
+                  <th className="py-2 pr-3 font-medium">Medicals</th>
                   <th className="py-2 pr-3 font-medium">Substitutes</th>
                   <th className="py-2 pr-3 font-medium">Referrals</th>
                   <th className="py-2 pr-3 font-medium">Visitors</th>
@@ -286,6 +287,7 @@ export default function MemberPerformance({
                     <td className="py-2 pr-3">{formatDisplayMonth(snapshot.report_to)}</td>
                     <td className="py-2 pr-3">{snapshot.present_count}</td>
                     <td className="py-2 pr-3">{snapshot.absent_count}</td>
+                    <td className="py-2 pr-3">{snapshot.medical_count}</td>
                     <td className="py-2 pr-3">{snapshot.substitute_count}</td>
                     <td className="py-2 pr-3">
                       {snapshot.referrals_given_inside + snapshot.referrals_given_outside}
