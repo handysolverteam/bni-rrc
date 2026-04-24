@@ -16,6 +16,7 @@ import type {
 import { buildSponsorAchievementSummary } from "./sponsor-achievements";
 import { calculateStage, getDerivedRenewalDates, isWithinRenewalWorkWindow } from "./stage";
 import { buildTrainingAchievementSummary } from "./training-achievements";
+import { isExactMonthlyPalmsSnapshot } from "./palms-monthly-performance";
 import { isActiveRenewalTaskType } from "./task-types";
 import {
   PAST_YEAR_TRAFFIC_LIGHT_LIMIT,
@@ -305,6 +306,31 @@ async function getTrainingAchievementsByMember(
   }
 }
 
+async function getLatestTrainingReportAnchor(importBatchIds: string[]): Promise<string | null> {
+  if (importBatchIds.length === 0) {
+    return null;
+  }
+
+  try {
+    const supabase = getServiceSupabase();
+    const { data, error } = await supabase
+      .from("import_batches")
+      .select("source_report_to")
+      .in("id", importBatchIds)
+      .not("source_report_to", "is", null)
+      .order("source_report_to", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      throw error;
+    }
+
+    return (data?.[0]?.source_report_to as string | undefined) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getDashboardCycles(today = new Date()): Promise<DashboardCycle[]> {
   const supabase = getServiceSupabase();
   const { data, error } = await supabase
@@ -459,6 +485,18 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     trainingAchievementsByMember.get(memberId) ?? [],
     today,
   );
+  const trainingAchievements = trainingAchievementsByMember.get(memberId) ?? [];
+  const latestExactMonthlyPalmsReportTo = (palmsSnapshotsByMember.get(memberId) ?? [])
+    .filter(isExactMonthlyPalmsSnapshot)
+    .map((snapshot) => snapshot.report_to)
+    .sort((left, right) => right.localeCompare(left))[0];
+  const latestTrainingReportAnchor = await getLatestTrainingReportAnchor(
+    [...new Set(trainingAchievements.map((item) => item.import_batch_id).filter((id): id is string => Boolean(id)))],
+  );
+  const performanceAnchorDate =
+    latestExactMonthlyPalmsReportTo ??
+    latestTrainingReportAnchor ??
+    today.toISOString().slice(0, 10);
 
   return {
     member: member as Member,
@@ -468,8 +506,9 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     palmsSnapshots: palmsSnapshotsByMember.get(memberId) ?? [],
     sponsorAchievements: sponsorAchievementsByMember.get(memberId) ?? [],
     sponsorSummary,
-    trainingAchievements: trainingAchievementsByMember.get(memberId) ?? [],
+    trainingAchievements,
     trainingSummary,
+    performanceAnchorDate,
     availableRoles,
     pastRoles: pastRolesByMember.get(memberId) ?? [],
   };

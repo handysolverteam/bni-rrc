@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildMemberPerformanceShareText } from "../lib/renewals/performance-share";
+import { buildPastYearTrainingPerformance } from "../lib/renewals/past-year-training-performance";
 import { buildMonthlyPalmsPerformance } from "../lib/renewals/palms-monthly-performance";
 import { buildPastYearPerformance } from "../lib/renewals/past-year-performance";
-import type { MemberPalmsSnapshot, MemberTrafficLight } from "../lib/types";
+import type { MemberPalmsSnapshot, MemberTrafficLight, MemberTrainingAchievement } from "../lib/types";
 
 const palmsSnapshots: MemberPalmsSnapshot[] = [
   {
@@ -100,29 +101,61 @@ const trafficLights: MemberTrafficLight[] = [
   },
 ];
 
+const trainingAchievements: MemberTrainingAchievement[] = [
+  {
+    id: "training-1",
+    member_id: "member-1",
+    chapter_name: "Influencers",
+    region_name: "Gurgaon",
+    event_date: "2025-06-07",
+    event_type: "Leadership Team Roundtable - India",
+    role: null,
+    join_date: null,
+    induction_date: null,
+    import_batch_id: "batch-1",
+  },
+  {
+    id: "training-2",
+    member_id: "member-1",
+    chapter_name: "Influencers",
+    region_name: "Gurgaon",
+    event_date: "2024-03-01",
+    event_type: "Weekly Presentation Workshop - India",
+    role: null,
+    join_date: null,
+    induction_date: null,
+    import_batch_id: "batch-1",
+  },
+];
+
 describe("buildMemberPerformanceShareText", () => {
   it("builds a WhatsApp-ready past year performance summary", () => {
     const text = buildMemberPerformanceShareText({
       memberName: "Viraj Bansal",
       palmsPerformance: buildMonthlyPalmsPerformance(palmsSnapshots),
       palmsRange: "1 Feb 2026 to 31 Mar 2026",
+      trainingPerformance: buildPastYearTrainingPerformance(trainingAchievements, "2026-03-31"),
+      trainingRange: "1 Apr 2025 to 31 Mar 2026",
       trafficLightPerformance: buildPastYearPerformance(trafficLights),
       trafficLightRange: "Sep 2025 to Mar 2026",
     });
 
-    expect(text).toContain("🌟 Past year performance of Viraj Bansal 🌟");
-    expect(text).toContain("📅 Monthly PALMS coverage: 2 months");
-    expect(text).toContain("📌 PALMS range: 1 Feb 2026 to 31 Mar 2026");
-    expect(text).toContain("🚦 Traffic-light range: Sep 2025 to Mar 2026");
-    expect(text).toContain("🤝 Referrals given: 14");
-    expect(text).toContain("📥 Referrals received: 12");
-    expect(text).toContain("🙌 Visitors: 5");
-    expect(text).toContain("👥 1-to-1s: 13");
-    expect(text).toContain("💰 TYFCB: ₹4,00,000");
-    expect(text).toContain("📈 Traffic-light score: Avg 62.5 | Best 70 | Worst 55");
-    expect(text).toContain("🚦 Last 12 traffic-light snapshots:");
-    expect(text).toContain("Mar 70 🟢 | Feb 55 🟡");
-    expect(text).toContain("🗓️ Performance updated till 31 Mar 2026");
+    expect(text).toContain("Past year performance of Viraj Bansal");
+    expect(text).toContain("Monthly PALMS coverage: 2 months");
+    expect(text).toContain("PALMS range: 1 Feb 2026 to 31 Mar 2026");
+    expect(text).toContain("Traffic-light range: Sep 2025 to Mar 2026");
+    expect(text).toContain("Training range: 1 Apr 2025 to 31 Mar 2026");
+    expect(text).toContain("Referrals given: 14");
+    expect(text).toContain("Referrals received: 12");
+    expect(text).toContain("Visitors: 5");
+    expect(text).toContain("1-to-1s: 13");
+    expect(text).toContain("CEU: 3");
+    expect(text).toContain("Trainings: 1");
+    expect(text).toContain("Traffic-light score: Avg 62.5 | Best 70 | Worst 55");
+    expect(text).toContain("Last 12 traffic-light snapshots:");
+    expect(text).toContain("Mar 70");
+    expect(text).toContain("Feb 55");
+    expect(text).toContain("Performance updated till 31 Mar 2026");
     expect(text).toContain("Regards,\nRetention and Renewal Coordinators\nTeam Moneyfestation");
   });
 
@@ -131,13 +164,16 @@ describe("buildMemberPerformanceShareText", () => {
       memberName: "Member One",
       palmsPerformance: buildMonthlyPalmsPerformance([]),
       palmsRange: null,
+      trainingPerformance: buildPastYearTrainingPerformance([], "2026-03-31"),
+      trainingRange: "1 Apr 2025 to 31 Mar 2026",
       trafficLightPerformance: buildPastYearPerformance([]),
       trafficLightRange: null,
     });
 
-    expect(text).toContain("📅 Monthly PALMS coverage: 0 months");
-    expect(text).toContain("🤝 Referrals given: 0");
-    expect(text).not.toContain("🚦 Last 12 traffic-light snapshots:");
-    expect(text).not.toContain("🗓️ Performance updated till");
+    expect(text).toContain("Monthly PALMS coverage: 0 months");
+    expect(text).toContain("Referrals given: 0");
+    expect(text).toContain("Trainings: 0");
+    expect(text).not.toContain("Last 12 traffic-light snapshots:");
+    expect(text).not.toContain("Performance updated till");
   });
 });

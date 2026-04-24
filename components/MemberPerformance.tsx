@@ -3,10 +3,16 @@
 import Link from "next/link";
 import { useState } from "react";
 import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
+import { buildPastYearTrainingPerformance } from "@/lib/renewals/past-year-training-performance";
 import { buildMonthlyPalmsPerformance } from "@/lib/renewals/palms-monthly-performance";
 import { buildPastYearPerformance } from "@/lib/renewals/past-year-performance";
 import { buildMemberPerformanceShareText } from "@/lib/renewals/performance-share";
-import type { DashboardCycle, Member, MemberPalmsSnapshot } from "@/lib/types";
+import type {
+  DashboardCycle,
+  Member,
+  MemberPalmsSnapshot,
+  MemberTrainingAchievement,
+} from "@/lib/types";
 import MemberSectionNav from "./MemberSectionNav";
 import { formatTrafficLightColor, trafficLightDotClasses } from "./TrafficLightBadge";
 
@@ -37,18 +43,27 @@ export default function MemberPerformance({
     member: Member;
     currentCycle: DashboardCycle | null;
     palmsSnapshots: MemberPalmsSnapshot[];
+    trainingAchievements: MemberTrainingAchievement[];
+    performanceAnchorDate: string;
   };
 }) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const trafficLightPerformance = buildPastYearPerformance(detail.currentCycle?.traffic_light_history ?? []);
   const palmsPerformance = buildMonthlyPalmsPerformance(detail.palmsSnapshots);
+  const trainingPerformance = buildPastYearTrainingPerformance(
+    detail.trainingAchievements,
+    detail.performanceAnchorDate,
+  );
   const palmsRange =
     palmsPerformance.monthlySnapshots.length > 0
       ? `${formatDisplayDate(palmsPerformance.monthlySnapshots[0].report_from)} to ${formatDisplayDate(
           palmsPerformance.monthlySnapshots[palmsPerformance.monthlySnapshots.length - 1].report_to,
         )}`
       : null;
+  const trainingRange = `${formatDisplayDate(trainingPerformance.windowStart)} to ${formatDisplayDate(
+    trainingPerformance.anchorDate,
+  )}`;
   const trafficLightRange =
     trafficLightPerformance.history.length > 0
       ? `${formatDisplayMonth(
@@ -64,6 +79,8 @@ export default function MemberPerformance({
     memberName: detail.member.name,
     palmsPerformance,
     palmsRange,
+    trainingPerformance,
+    trainingRange,
     trafficLightPerformance,
     trafficLightRange,
   });
@@ -98,14 +115,16 @@ export default function MemberPerformance({
               <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.report_role || "No report role"}</p>
             </div>
             <div className="rounded-md bg-[#eef1ea] px-4 py-3">
-              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Monthly PALMS coverage</p>
-              <p className="mt-1 text-2xl font-semibold tracking-normal text-[var(--accent)]">
-                {palmsPerformance.monthsCovered} month{palmsPerformance.monthsCovered === 1 ? "" : "s"}
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                Performance anchor
               </p>
-              <p className="mt-1 text-sm text-[var(--muted)]">Exact monthly PALMS files used for yearly totals</p>
-              {palmsRange ? (
-                <p className="mt-1 text-sm font-medium text-[var(--accent)]">{palmsRange}</p>
-              ) : null}
+              <p className="mt-1 text-2xl font-semibold tracking-normal text-[var(--accent)]">
+                {formatDisplayMonth(trainingPerformance.anchorDate)}
+              </p>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Past-year training window aligned to latest report date
+              </p>
+              <p className="mt-1 text-sm font-medium text-[var(--accent)]">{trainingRange}</p>
             </div>
           </div>
           <div className="rounded-md border border-[var(--line)] bg-[#f7f7f4] p-4">
@@ -196,13 +215,16 @@ export default function MemberPerformance({
               <MetricItem label="Late" value={formatNumber(palmsPerformance.totals.late)} />
               <MetricItem label="Medical" value={formatNumber(palmsPerformance.totals.medical)} />
               <MetricItem label="Substitute" value={formatNumber(palmsPerformance.totals.substitute)} />
-              <MetricItem label="Trainings" value={formatNumber(palmsPerformance.totals.trainings)} />
+              <MetricItem label="Trainings" value={formatNumber(trainingPerformance.count)} />
             </dl>
           ) : (
             <p className="mt-3 text-sm text-[var(--muted)]">
-              No exact monthly PALMS files imported yet, so yearly totals are unavailable.
+              No exact monthly PALMS files imported yet. Trainings still use imported BNI training rows.
             </p>
           )}
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            Trainings count uses imported BNI training attendance from {trainingRange}.
+          </p>
         </div>
       </section>
 
