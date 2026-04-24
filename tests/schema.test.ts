@@ -66,6 +66,17 @@ describe("schema", () => {
     expect(sql).toContain("'chapter_sponsor_report'");
   });
 
+  it("stores training achievements separately and allows training report imports", () => {
+    const sql = readFileSync(
+      "supabase/migrations/013_member_training_achievements.sql",
+      "utf8",
+    ).toLowerCase();
+
+    expect(sql).toContain("create table public.member_training_achievements");
+    expect(sql).toContain("unique (member_id, chapter_name, event_date, event_type)");
+    expect(sql).toContain("'chapter_member_training_report'");
+  });
+
   it("stores traffic-light report windows separately from the ending month", () => {
     const sql = readFileSync("supabase/migrations/009_traffic_light_report_windows.sql", "utf8").toLowerCase();
 

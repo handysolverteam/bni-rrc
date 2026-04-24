@@ -57,6 +57,9 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
   const [sponsorSubmitting, setSponsorSubmitting] = useState(false);
   const [sponsorResult, setSponsorResult] = useState<ImportResult | null>(null);
   const [sponsorError, setSponsorError] = useState<string | null>(null);
+  const [trainingSubmitting, setTrainingSubmitting] = useState(false);
+  const [trainingResult, setTrainingResult] = useState<ImportResult | null>(null);
+  const [trainingError, setTrainingError] = useState<string | null>(null);
 
   function hasInvalidPalmsFiles(files: QueuedPalmsFile[]): boolean {
     return files.some((file) => file.previewError !== null);
@@ -278,6 +281,46 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
       </form>
 
       <PalmsCoverageSection coverage={coverage} />
+
+      <form
+        onSubmit={(event) =>
+          submitImport(
+            event,
+            "/api/import/trainings",
+            setTrainingSubmitting,
+            setTrainingResult,
+            setTrainingError,
+          )
+        }
+        className="space-y-4 rounded-md border border-[var(--line)] bg-white p-4"
+      >
+        <div>
+          <p className="text-sm font-semibold">BNI member training report `.xls`</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Upload the chapter member training report to track lifetime and past-year training
+            attendance counts on member achievement pages.
+          </p>
+        </div>
+        <label className="block">
+          <span className="text-sm font-medium">Training report `.xls`</span>
+          <input
+            className="focus-ring mt-2 block w-full rounded-md border border-[var(--line)] p-2 text-sm"
+            name="file"
+            type="file"
+            accept=".xls"
+            required
+          />
+        </label>
+        <button
+          className="focus-ring min-h-11 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] disabled:opacity-60"
+          disabled={trainingSubmitting}
+          type="submit"
+        >
+          {trainingSubmitting ? "Importing..." : "Import training report"}
+        </button>
+
+        <ImportFeedback result={trainingResult} error={trainingError} />
+      </form>
 
       <form
         onSubmit={(event) =>

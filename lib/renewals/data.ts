@@ -7,6 +7,7 @@ import type {
   MemberPastRoleEntry,
   MemberPalmsSnapshot,
   MemberSponsorAchievement,
+  MemberTrainingAchievement,
   MemberTrafficLight,
   RenewalAssignment,
   RenewalCycle,
@@ -14,6 +15,7 @@ import type {
 } from "../types";
 import { buildSponsorAchievementSummary } from "./sponsor-achievements";
 import { calculateStage, getDerivedRenewalDates, isWithinRenewalWorkWindow } from "./stage";
+import { buildTrainingAchievementSummary } from "./training-achievements";
 import { isActiveRenewalTaskType } from "./task-types";
 import {
   PAST_YEAR_TRAFFIC_LIGHT_LIMIT,
@@ -35,6 +37,24 @@ function isMissingSponsorAchievementsSchemaError(error: unknown): boolean {
     code === "42P01" ||
     combined.includes("member_sponsor_achievements") ||
     combined.includes("sponsor achievements")
+  );
+}
+
+function isMissingTrainingAchievementsSchemaError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const maybeError = error as { code?: unknown; message?: unknown; details?: unknown };
+  const code = typeof maybeError.code === "string" ? maybeError.code : "";
+  const message = typeof maybeError.message === "string" ? maybeError.message.toLowerCase() : "";
+  const details = typeof maybeError.details === "string" ? maybeError.details.toLowerCase() : "";
+  const combined = `${message} ${details}`;
+
+  return (
+    code === "42P01" ||
+    combined.includes("member_training_achievements") ||
+    combined.includes("training achievements")
   );
 }
 
@@ -243,6 +263,48 @@ async function getSponsorAchievementsByMember(
   }
 }
 
+async function getTrainingAchievementsByMember(
+  memberIds: string[],
+): Promise<Map<string, MemberTrainingAchievement[]>> {
+  if (memberIds.length === 0) {
+    return new Map();
+  }
+
+  try {
+    const supabase = getServiceSupabase();
+    const { data, error } = await supabase
+      .from("member_training_achievements")
+      .select("*")
+      .in("member_id", memberIds)
+      .order("event_date", { ascending: false })
+      .order("event_type", { ascending: true });
+
+    if (error) {
+      if (isMissingTrainingAchievementsSchemaError(error)) {
+        return new Map();
+      }
+
+      throw error;
+    }
+
+    const grouped = new Map<string, MemberTrainingAchievement[]>();
+
+    for (const row of (data ?? []) as MemberTrainingAchievement[]) {
+      const achievements = grouped.get(row.member_id) ?? [];
+      achievements.push(row);
+      grouped.set(row.member_id, achievements);
+    }
+
+    return grouped;
+  } catch (error) {
+    if (isMissingTrainingAchievementsSchemaError(error)) {
+      return new Map();
+    }
+
+    throw error;
+  }
+}
+
 export async function getDashboardCycles(today = new Date()): Promise<DashboardCycle[]> {
   const supabase = getServiceSupabase();
   const { data, error } = await supabase
@@ -379,16 +441,22 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
   const trafficLightHistory = trafficLightHistories.get(memberId) ?? [];
   const latestPalmsSnapshots = await getLatestPalmsSnapshotsByMember([memberId]);
   const palmsSnapshotsByMember = await getPalmsSnapshotsByMember([memberId]);
-  const [availableRoles, pastRolesByMember, sponsorAchievementsByMember] = await Promise.all([
+  const [availableRoles, pastRolesByMember, sponsorAchievementsByMember, trainingAchievementsByMember] =
+    await Promise.all([
     getAvailableRoles(),
     getPastRolesByMember([memberId]),
     getSponsorAchievementsByMember([memberId]),
+    getTrainingAchievementsByMember([memberId]),
   ]);
   const enrichedCycles = ((cycles ?? []) as RenewalCycleRow[]).map((row) =>
     enrichCycle({ ...row, members: member as Member }, today, trafficLightHistory),
   );
   const sponsorSummary = buildSponsorAchievementSummary(
     sponsorAchievementsByMember.get(memberId) ?? [],
+    today,
+  );
+  const trainingSummary = buildTrainingAchievementSummary(
+    trainingAchievementsByMember.get(memberId) ?? [],
     today,
   );
 
@@ -400,6 +468,8 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     palmsSnapshots: palmsSnapshotsByMember.get(memberId) ?? [],
     sponsorAchievements: sponsorAchievementsByMember.get(memberId) ?? [],
     sponsorSummary,
+    trainingAchievements: trainingAchievementsByMember.get(memberId) ?? [],
+    trainingSummary,
     availableRoles,
     pastRoles: pastRolesByMember.get(memberId) ?? [],
   };

@@ -89,6 +89,19 @@ export type MemberSponsorAchievement = {
   import_batch_id: string | null;
 };
 
+export type MemberTrainingAchievement = {
+  id: string;
+  member_id: string;
+  chapter_name: string;
+  region_name: string | null;
+  event_date: string;
+  event_type: string;
+  role: string | null;
+  join_date: string | null;
+  induction_date: string | null;
+  import_batch_id: string | null;
+};
+
 export type ChapterRole = {
   id: string;
   name: string;
@@ -182,13 +195,21 @@ export type SponsorAchievementSummary = {
   pastYearCount: number;
 };
 
+export type TrainingAchievementSummary = {
+  lifetimeTrainings: MemberTrainingAchievement[];
+  pastYearTrainings: MemberTrainingAchievement[];
+  lifetimeCount: number;
+  pastYearCount: number;
+};
+
 export type ImportSourceType =
   | "unknown"
   | "membership_dues_xls"
   | "traffic_lights_pdf"
   | "palms_chapter_summary"
   | "membership_length_pdf"
-  | "chapter_sponsor_report";
+  | "chapter_sponsor_report"
+  | "chapter_member_training_report";
 
 export type ImportMemberRow = {
   name: string;

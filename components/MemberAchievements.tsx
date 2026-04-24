@@ -14,6 +14,8 @@ import type {
   MemberPastRoleEntry,
   MemberSponsorAchievement,
   SponsorAchievementSummary,
+  MemberTrainingAchievement,
+  TrainingAchievementSummary,
 } from "@/lib/types";
 import PastRolesSection from "./PastRolesSection";
 import MemberSectionNav from "./MemberSectionNav";
@@ -27,6 +29,8 @@ type MemberAchievementsPayload = {
   pastRoles: MemberPastRoleEntry[];
   sponsorAchievements: MemberSponsorAchievement[];
   sponsorSummary: SponsorAchievementSummary;
+  trainingAchievements: MemberTrainingAchievement[];
+  trainingSummary: TrainingAchievementSummary;
 };
 
 function formatNumber(value: number | null): string {
@@ -221,6 +225,18 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
         <AchievementCard
           label="Sponsors (past year)"
           value={formatNumber(detail.sponsorSummary.pastYearCount)}
+        />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <AchievementCard
+          label="Trainings (lifetime)"
+          value={formatNumber(detail.trainingSummary.lifetimeCount)}
+          emphasize
+        />
+        <AchievementCard
+          label="Trainings (past year)"
+          value={formatNumber(detail.trainingSummary.pastYearCount)}
         />
       </section>
 
