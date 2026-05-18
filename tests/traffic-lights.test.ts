@@ -1,10 +1,14 @@
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   getTrafficLightColor,
   parseTrafficLightReport,
   parseTrafficLightReportMonth,
   parseTrafficLightReportWindow,
+  parseTrafficLightXlsxReport,
 } from "../lib/renewals/traffic-lights";
+
+const sampleXlsxReport = "C:\\Users\\rahul\\Downloads\\Influencers April '26.xlsx";
 
 const januaryText = `First Name Last Name P A L M S RGT RRT V T TYFCB Trainings WEEK Total
 Neraj K Anand 26 0 0 0 0 108 120 19 2 1,06,74,768     3 26 95
@@ -90,5 +94,34 @@ describe("traffic-light parsing", () => {
     expect(parsed.reportMonth).toBe("2026-02-01");
     expect(parsed.reportWindowStart).toBe("2025-10-01");
     expect(parsed.reportWindowEnd).toBe("2026-02-01");
+  });
+
+  const sampleXlsxReportTest = existsSync(sampleXlsxReport) ? it : it.skip;
+
+  sampleXlsxReportTest("parses score-only XLSX traffic-light reports", () => {
+    const parsed = parseTrafficLightXlsxReport(readFileSync(sampleXlsxReport));
+
+    expect(parsed.reportMonth).toBe("2026-04-01");
+    expect(parsed.reportWindowStart).toBe("2026-04-01");
+    expect(parsed.reportWindowEnd).toBe("2026-04-01");
+    expect(parsed.rows).toHaveLength(76);
+    expect(parsed.rows[0]).toEqual({
+      name: "Neraj K Anand",
+      score: 100,
+      color: "green",
+    });
+    expect(parsed.rows.at(-1)).toEqual({
+      name: "Amit Chandna",
+      score: 20,
+      color: "grey",
+    });
+  });
+
+  sampleXlsxReportTest("allows an explicit XLSX report month override", () => {
+    const parsed = parseTrafficLightXlsxReport(readFileSync(sampleXlsxReport), "2026-05-01");
+
+    expect(parsed.reportMonth).toBe("2026-05-01");
+    expect(parsed.reportWindowStart).toBe("2026-05-01");
+    expect(parsed.reportWindowEnd).toBe("2026-05-01");
   });
 });

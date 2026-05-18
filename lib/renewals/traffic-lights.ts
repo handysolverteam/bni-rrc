@@ -1,4 +1,5 @@
 import type { TrafficLightColor } from "../types";
+import * as XLSX from "xlsx";
 
 export type ParsedTrafficLightRow = {
   name: string;
@@ -26,19 +27,43 @@ export type ParsedTrafficLightReport = {
   hasTyfcb: boolean;
 };
 
+export type ParsedTrafficLightScoreRow = {
+  name: string;
+  score: number;
+  color: TrafficLightColor;
+};
+
+export type ParsedTrafficLightScoreReport = {
+  reportMonth: string;
+  reportWindowStart: string;
+  reportWindowEnd: string;
+  rows: ParsedTrafficLightScoreRow[];
+};
+
 const monthIndexes: Record<string, string> = {
   jan: "01",
+  january: "01",
   feb: "02",
+  february: "02",
   mar: "03",
+  march: "03",
   apr: "04",
+  april: "04",
   may: "05",
   jun: "06",
+  june: "06",
   jul: "07",
+  july: "07",
   aug: "08",
+  august: "08",
   sep: "09",
+  september: "09",
   oct: "10",
+  october: "10",
   nov: "11",
+  november: "11",
   dec: "12",
+  december: "12",
 };
 
 export function getTrafficLightColor(score: number): TrafficLightColor {
@@ -65,6 +90,16 @@ function parseMonthToken(month: string, year: string): string {
   }
 
   return `20${year}-${monthIndex}-01`;
+}
+
+function parseTrafficLightXlsxTitleMonth(title: string): string {
+  const match = title.match(/\bFOR\s+([A-Z]+)\s+'?(\d{2})\b/i);
+
+  if (!match) {
+    throw new Error("Traffic-light XLSX report month was not found.");
+  }
+
+  return parseMonthToken(match[1], match[2]);
 }
 
 export function parseTrafficLightReportMonth(text: string): string {
@@ -97,6 +132,18 @@ function parseNumberToken(value: string): number {
   }
 
   return parsed;
+}
+
+function parseNumberValue(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    return parseNumberToken(value);
+  }
+
+  throw new Error(`Invalid numeric value: ${String(value)}`);
 }
 
 function parseOptionalAmount(value: string): number | null {
@@ -192,5 +239,70 @@ export function parseTrafficLightReport(
     reportWindowEnd: reportMonthOverride || reportWindow.reportWindowEnd,
     rows,
     hasTyfcb,
+  };
+}
+
+function normalizeHeader(value: unknown): string {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+export function parseTrafficLightXlsxReport(
+  buffer: Buffer,
+  reportMonthOverride?: string | null,
+): ParsedTrafficLightScoreReport {
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const sheetName = workbook.SheetNames[0];
+
+  if (!sheetName) {
+    throw new Error("Traffic-light XLSX workbook does not contain any sheets.");
+  }
+
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false });
+  const title = normalizeHeader(rows[0]?.[0]);
+
+  if (!title.includes("MEMBER TRAFFIC LIGHTS")) {
+    throw new Error("Only BNI Member Traffic Lights XLSX reports are supported.");
+  }
+
+  const headerRowIndex = rows.findIndex((row) => {
+    const headers = row.map(normalizeHeader);
+    return headers.includes("Name") && headers.includes("Total Score");
+  });
+
+  if (headerRowIndex < 0) {
+    throw new Error("Traffic-light XLSX headers were not found.");
+  }
+
+  const headers = rows[headerRowIndex].map(normalizeHeader);
+  const nameIndex = headers.indexOf("Name");
+  const scoreIndex = headers.indexOf("Total Score");
+  const reportMonth = reportMonthOverride || parseTrafficLightXlsxTitleMonth(title);
+  const parsedRows: ParsedTrafficLightScoreRow[] = [];
+
+  for (const row of rows.slice(headerRowIndex + 1)) {
+    const name = normalizeHeader(row[nameIndex]);
+
+    if (!name || name === "Name") {
+      continue;
+    }
+
+    const score = parseNumberValue(row[scoreIndex]);
+    parsedRows.push({
+      name,
+      score,
+      color: getTrafficLightColor(score),
+    });
+  }
+
+  if (parsedRows.length === 0) {
+    throw new Error("No traffic-light rows were found in the XLSX report.");
+  }
+
+  return {
+    reportMonth,
+    reportWindowStart: reportMonth,
+    reportWindowEnd: reportMonth,
+    rows: parsedRows,
   };
 }

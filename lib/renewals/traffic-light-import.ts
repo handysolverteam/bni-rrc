@@ -1,7 +1,11 @@
 import { getServiceSupabase } from "../supabase/server";
 import type { Member } from "../types";
 import { normalizeImportKey } from "./import";
-import { parseTrafficLightReport } from "./traffic-lights";
+import {
+  parseTrafficLightReport,
+  parseTrafficLightXlsxReport,
+  type ParsedTrafficLightScoreReport,
+} from "./traffic-lights";
 
 export type TrafficLightImportResult = {
   batchId: string | null;
@@ -28,7 +32,7 @@ function normalizeReportMonth(value: string | null): string | null {
   return `${match[1]}-${match[2]}-01`;
 }
 
-function formatImportError(error: unknown): string {
+export function formatImportError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
@@ -43,6 +47,73 @@ function formatImportError(error: unknown): string {
   return "Import failed";
 }
 
+async function createTrafficLightImportBatch(input: {
+  filename: string;
+  reportMonth: string;
+  reportWindowStart: string;
+  sourceType: "traffic_lights_pdf" | "traffic_lights_xlsx";
+}) {
+  const supabase = getServiceSupabase();
+  const batchPayload = {
+    filename: input.filename,
+    report_date: input.reportMonth,
+    source_type: input.sourceType,
+    source_report_from: input.reportWindowStart,
+    source_report_to: input.reportMonth,
+    status: "pending",
+  };
+  const { data: batch, error: batchError } = await supabase
+    .from("import_batches")
+    .insert(batchPayload)
+    .select("id")
+    .single();
+
+  if (batchError) {
+    const message = formatImportError(batchError);
+
+    if (input.sourceType === "traffic_lights_xlsx" && /source_type|constraint|check/i.test(message)) {
+      const { data: fallbackBatch, error: fallbackBatchError } = await supabase
+        .from("import_batches")
+        .insert({
+          ...batchPayload,
+          source_type: "traffic_lights_pdf",
+        })
+        .select("id")
+        .single();
+
+      if (!fallbackBatchError) {
+        return fallbackBatch;
+      }
+
+      throw fallbackBatchError;
+    }
+
+    throw batchError;
+  }
+
+  return batch;
+}
+
+async function loadMembersByName(): Promise<Map<string, Member[]>> {
+  const supabase = getServiceSupabase();
+  const { data: existingMembers, error: membersError } = await supabase
+    .from("members")
+    .select("*");
+
+  if (membersError) {
+    throw membersError;
+  }
+
+  const membersByName = new Map<string, Member[]>();
+
+  for (const member of (existingMembers ?? []) as Member[]) {
+    const key = memberNameKey(member);
+    membersByName.set(key, [...(membersByName.get(key) ?? []), member]);
+  }
+
+  return membersByName;
+}
+
 export async function importTrafficLightReport(
   text: string,
   filename: string,
@@ -51,42 +122,18 @@ export async function importTrafficLightReport(
   const supabase = getServiceSupabase();
   const parsed = parseTrafficLightReport(text, normalizeReportMonth(reportMonthOverride ?? null));
   const errors: string[] = [];
-
-  const { data: batch, error: batchError } = await supabase
-    .from("import_batches")
-    .insert({
-      filename,
-      report_date: parsed.reportMonth,
-      source_type: "traffic_lights_pdf",
-      source_report_from: parsed.reportWindowStart,
-      source_report_to: parsed.reportMonth,
-      status: "pending",
-    })
-    .select("id")
-    .single();
-
-  if (batchError) {
-    throw batchError;
-  }
+  const batch = await createTrafficLightImportBatch({
+    filename,
+    reportMonth: parsed.reportMonth,
+    reportWindowStart: parsed.reportWindowStart,
+    sourceType: "traffic_lights_pdf",
+  });
 
   let importedCount = 0;
   let skippedCount = 0;
 
   try {
-    const { data: existingMembers, error: membersError } = await supabase
-      .from("members")
-      .select("*");
-
-    if (membersError) {
-      throw membersError;
-    }
-
-    const membersByName = new Map<string, Member[]>();
-
-    for (const member of (existingMembers ?? []) as Member[]) {
-      const key = memberNameKey(member);
-      membersByName.set(key, [...(membersByName.get(key) ?? []), member]);
-    }
+    const membersByName = await loadMembersByName();
 
     const records = [];
 
@@ -138,6 +185,152 @@ export async function importTrafficLightReport(
         errors.push(formatImportError(error));
       } else {
         importedCount = records.length;
+      }
+    }
+
+    await supabase
+      .from("import_batches")
+      .update({
+        imported_count: importedCount,
+        skipped_count: skippedCount,
+        status: errors.length > 0 ? "failed" : "completed",
+        error_message: errors.length > 0 ? errors.join("\n") : null,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", batch.id);
+
+    return {
+      batchId: batch.id,
+      importedCount,
+      skippedCount,
+      errors,
+    };
+  } catch (error) {
+    await supabase
+      .from("import_batches")
+      .update({
+        status: "failed",
+        error_message: formatImportError(error),
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", batch.id);
+
+    throw error;
+  }
+}
+
+export async function importTrafficLightXlsxReport(
+  buffer: Buffer,
+  filename: string,
+  reportMonthOverride?: string | null,
+): Promise<TrafficLightImportResult> {
+  const supabase = getServiceSupabase();
+  const parsed = parseTrafficLightXlsxReport(buffer, normalizeReportMonth(reportMonthOverride ?? null));
+  const errors: string[] = [];
+  const batch = await createTrafficLightImportBatch({
+    filename,
+    reportMonth: parsed.reportMonth,
+    reportWindowStart: parsed.reportWindowStart,
+    sourceType: "traffic_lights_xlsx",
+  });
+
+  let importedCount = 0;
+  let skippedCount = 0;
+
+  try {
+    const membersByName = await loadMembersByName();
+    const matchedRows: Array<{
+      member: Member;
+      row: ParsedTrafficLightScoreReport["rows"][number];
+    }> = [];
+
+    for (const row of parsed.rows) {
+      const matches = membersByName.get(normalizeImportKey(row.name)) ?? [];
+
+      if (matches.length === 0) {
+        skippedCount += 1;
+        errors.push(`${row.name}: member not found`);
+        continue;
+      }
+
+      if (matches.length > 1) {
+        skippedCount += 1;
+        errors.push(`${row.name}: multiple members matched this name`);
+        continue;
+      }
+
+      matchedRows.push({ member: matches[0], row });
+    }
+
+    if (matchedRows.length > 0) {
+      const memberIds = matchedRows.map((item) => item.member.id);
+      const { data: existingRows, error: existingRowsError } = await supabase
+        .from("member_traffic_lights")
+        .select("member_id")
+        .eq("report_month", parsed.reportMonth)
+        .in("member_id", memberIds);
+
+      if (existingRowsError) {
+        throw existingRowsError;
+      }
+
+      const existingMemberIds = new Set(
+        ((existingRows ?? []) as Array<{ member_id: string }>).map((row) => row.member_id),
+      );
+      const inserts = matchedRows
+        .filter((item) => !existingMemberIds.has(item.member.id))
+        .map((item) => ({
+          member_id: item.member.id,
+          report_month: parsed.reportMonth,
+          report_window_start: parsed.reportWindowStart,
+          report_window_end: parsed.reportWindowEnd,
+          score: item.row.score,
+          color: item.row.color,
+          present_count: 0,
+          absent_count: 0,
+          late_count: 0,
+          medical_count: 0,
+          substitute_count: 0,
+          referrals_given: 0,
+          referrals_received: 0,
+          visitors: 0,
+          testimonials: 0,
+          tyfcb: null,
+          trainings: 0,
+          week_count: 0,
+          import_batch_id: batch.id,
+        }));
+
+      if (inserts.length > 0) {
+        const { error } = await supabase.from("member_traffic_lights").insert(inserts);
+
+        if (error) {
+          skippedCount += inserts.length;
+          errors.push(formatImportError(error));
+        } else {
+          importedCount += inserts.length;
+        }
+      }
+
+      for (const item of matchedRows.filter((row) => existingMemberIds.has(row.member.id))) {
+        const { error } = await supabase
+          .from("member_traffic_lights")
+          .update({
+            report_window_start: parsed.reportWindowStart,
+            report_window_end: parsed.reportWindowEnd,
+            score: item.row.score,
+            color: item.row.color,
+            import_batch_id: batch.id,
+          })
+          .eq("member_id", item.member.id)
+          .eq("report_month", parsed.reportMonth);
+
+        if (error) {
+          skippedCount += 1;
+          errors.push(`${item.row.name}: ${formatImportError(error)}`);
+        } else {
+          importedCount += 1;
+        }
       }
     }
 

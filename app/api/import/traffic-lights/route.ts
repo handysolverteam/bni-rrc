@@ -1,7 +1,11 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { PDFParse } from "pdf-parse";
-import { importTrafficLightReport } from "@/lib/renewals/traffic-light-import";
+import {
+  formatImportError,
+  importTrafficLightReport,
+  importTrafficLightXlsxReport,
+} from "@/lib/renewals/traffic-light-import";
 
 export const runtime = "nodejs";
 
@@ -29,24 +33,24 @@ export async function POST(request: Request) {
     const reportMonth = formData.get("reportMonth");
 
     if (!(file instanceof File)) {
-      return Response.json({ error: "A .pdf file is required." }, { status: 400 });
+      return Response.json({ error: "A .pdf or .xlsx file is required." }, { status: 400 });
     }
 
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      return Response.json({ error: "Only PDF traffic-light reports are supported." }, { status: 400 });
+    const filename = file.name.toLowerCase();
+
+    if (!filename.endsWith(".pdf") && !filename.endsWith(".xlsx")) {
+      return Response.json({ error: "Only PDF or XLSX traffic-light reports are supported." }, { status: 400 });
     }
 
-    const text = await extractPdfText(file);
-    const result = await importTrafficLightReport(
-      text,
-      file.name,
-      typeof reportMonth === "string" && reportMonth ? reportMonth : null,
-    );
+    const normalizedReportMonth = typeof reportMonth === "string" && reportMonth ? reportMonth : null;
+    const result = filename.endsWith(".xlsx")
+      ? await importTrafficLightXlsxReport(Buffer.from(await file.arrayBuffer()), file.name, normalizedReportMonth)
+      : await importTrafficLightReport(await extractPdfText(file), file.name, normalizedReportMonth);
 
     return Response.json(result);
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "Import failed" },
+      { error: formatImportError(error) },
       { status: 500 },
     );
   }

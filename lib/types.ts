@@ -206,6 +206,7 @@ export type ImportSourceType =
   | "unknown"
   | "membership_dues_xls"
   | "traffic_lights_pdf"
+  | "traffic_lights_xlsx"
   | "palms_chapter_summary"
   | "membership_length_pdf"
   | "chapter_sponsor_report"

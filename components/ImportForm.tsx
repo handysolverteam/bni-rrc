@@ -408,18 +408,18 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
         className="space-y-4 rounded-md border border-[var(--line)] bg-white p-4"
       >
         <div>
-          <p className="text-sm font-semibold">Traffic lights PDF</p>
+          <p className="text-sm font-semibold">Traffic lights `.pdf` or `.xlsx`</p>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Upload the monthly Member Traffic Lights PDF. Month override is optional.
+            Upload the monthly Member Traffic Lights PDF or score-only XLSX. Month override is optional.
           </p>
         </div>
         <label className="block">
-          <span className="text-sm font-medium">Traffic lights `.pdf`</span>
+          <span className="text-sm font-medium">Traffic lights `.pdf` or `.xlsx`</span>
           <input
             className="focus-ring mt-2 block w-full rounded-md border border-[var(--line)] p-2 text-sm"
             name="file"
             type="file"
-            accept=".pdf"
+            accept=".pdf,.xlsx"
             required
           />
         </label>
