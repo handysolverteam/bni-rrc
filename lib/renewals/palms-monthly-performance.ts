@@ -32,6 +32,11 @@ export type PalmsMonthlyCoverageEntry = {
   createdAt: string | null;
 };
 
+export type MonthlyPalmsPerformanceOptions = {
+  anchorDate?: string | Date;
+  limit?: number;
+};
+
 function getMonthEnd(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
 }
@@ -69,6 +74,28 @@ function formatMonthStart(date: Date): string {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-01`;
 }
 
+function formatDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function getPastYearWindow(anchorDateInput: string | Date): { windowStart: string; anchorDate: string } | null {
+  const anchorDate =
+    typeof anchorDateInput === "string" ? parseDateOnly(anchorDateInput) : new Date(anchorDateInput);
+
+  if (!anchorDate || Number.isNaN(anchorDate.getTime())) {
+    return null;
+  }
+
+  const windowStartDate = new Date(anchorDate);
+  windowStartDate.setUTCFullYear(windowStartDate.getUTCFullYear() - 1);
+  windowStartDate.setUTCDate(windowStartDate.getUTCDate() + 1);
+
+  return {
+    windowStart: formatDateOnly(windowStartDate),
+    anchorDate: formatDateOnly(anchorDate),
+  };
+}
+
 export function getMissingPalmsMonths(entries: PalmsMonthlyCoverageEntry[]): string[] {
   const monthlyEntries = entries
     .filter((entry) => isExactMonthlyPalmsWindow({ report_from: entry.reportFrom, report_to: entry.reportTo }))
@@ -102,10 +129,22 @@ export function getMissingPalmsMonths(entries: PalmsMonthlyCoverageEntry[]): str
 
 export function buildMonthlyPalmsPerformance(
   snapshots: MemberPalmsSnapshot[],
-  limit = 12,
+  options: MonthlyPalmsPerformanceOptions | number = {},
 ): MonthlyPalmsPerformance {
+  const resolvedOptions = typeof options === "number" ? { limit: options } : options;
+  const limit = resolvedOptions.limit ?? 12;
+  const pastYearWindow = resolvedOptions.anchorDate
+    ? getPastYearWindow(resolvedOptions.anchorDate)
+    : null;
   const monthlySnapshots = [...snapshots]
     .filter(isExactMonthlyPalmsSnapshot)
+    .filter((snapshot) => {
+      if (!pastYearWindow) {
+        return true;
+      }
+
+      return snapshot.report_from >= pastYearWindow.windowStart && snapshot.report_to <= pastYearWindow.anchorDate;
+    })
     .sort((left, right) => right.report_to.localeCompare(left.report_to))
     .slice(0, limit)
     .sort((left, right) => left.report_to.localeCompare(right.report_to));

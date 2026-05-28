@@ -39,6 +39,8 @@ export type PalmsBatchImportResult = {
   files: PalmsBatchFileResult[];
 };
 
+type PalmsImportMode = "monthly" | "lifetime";
+
 function formatImportError(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -59,24 +61,52 @@ export async function importPalmsChapterSummaryReport(
   filename: string,
 ): Promise<ImportResult> {
   const parsed = parsePalmsChapterSummaryReport(xml);
-  return importParsedPalmsChapterSummaryReport(parsed, filename);
+  return importParsedPalmsChapterSummaryReport(parsed, filename, "monthly");
+}
+
+export async function importLifetimePalmsChapterSummaryReport(
+  xml: string,
+  filename: string,
+): Promise<ImportResult> {
+  const parsed = parsePalmsChapterSummaryReport(xml);
+  return importParsedPalmsChapterSummaryReport(parsed, filename, "lifetime");
+}
+
+export function validatePalmsReportWindow(parsed: ParsedPalmsReport, mode: PalmsImportMode): void {
+  if (!parsed.reportTo) {
+    throw new Error("PALMS report end date was not found.");
+  }
+
+  if (!parsed.reportFrom) {
+    throw new Error("PALMS report start date was not found.");
+  }
+
+  const isMonthly = isExactMonthlyPalmsWindow({
+    report_from: parsed.reportFrom,
+    report_to: parsed.reportTo,
+  });
+
+  if (mode === "monthly" && !isMonthly) {
+    throw new Error("This PALMS file is not a single calendar month.");
+  }
+
+  if (mode === "lifetime" && isMonthly) {
+    throw new Error("This is a monthly PALMS file. Use the monthly PALMS upload instead.");
+  }
 }
 
 async function importParsedPalmsChapterSummaryReport(
   parsed: ParsedPalmsReport,
   filename: string,
+  mode: PalmsImportMode,
 ): Promise<ImportResult> {
   const supabase = getServiceSupabase();
+  validatePalmsReportWindow(parsed, mode);
+  const reportFrom = parsed.reportFrom;
+  const reportTo = parsed.reportTo;
 
-  if (!parsed.reportTo) {
-    throw new Error("PALMS report end date was not found.");
-  }
-
-  if (
-    !parsed.reportFrom ||
-    !isExactMonthlyPalmsWindow({ report_from: parsed.reportFrom, report_to: parsed.reportTo })
-  ) {
-    throw new Error("This PALMS file is not a single calendar month.");
+  if (!reportFrom || !reportTo) {
+    throw new Error("PALMS report window was not found.");
   }
 
   const reportIdentity = buildPalmsReportIdentity(parsed);
@@ -84,8 +114,8 @@ async function importParsedPalmsChapterSummaryReport(
     .from("member_palms_snapshots")
     .select("id")
     .eq("chapter_name", parsed.chapterName ?? "Unknown chapter")
-    .eq("report_from", parsed.reportFrom ?? parsed.reportTo)
-    .eq("report_to", parsed.reportTo)
+    .eq("report_from", reportFrom)
+    .eq("report_to", reportTo)
     .limit(1);
 
   if (existingSnapshotsError) {
@@ -97,11 +127,11 @@ async function importParsedPalmsChapterSummaryReport(
       .from("import_batches")
       .insert({
         filename,
-        report_date: parsed.reportTo,
+        report_date: reportTo,
         source_type: "palms_chapter_summary",
         source_chapter_name: parsed.chapterName ?? "Unknown chapter",
-        source_report_from: parsed.reportFrom ?? parsed.reportTo,
-        source_report_to: parsed.reportTo,
+        source_report_from: reportFrom,
+        source_report_to: reportTo,
         imported_count: 0,
         skipped_count: parsed.rows.length,
         status: "completed",
@@ -127,11 +157,11 @@ async function importParsedPalmsChapterSummaryReport(
     .from("import_batches")
     .insert({
       filename,
-      report_date: parsed.reportTo,
+      report_date: reportTo,
       source_type: "palms_chapter_summary",
       source_chapter_name: parsed.chapterName ?? "Unknown chapter",
-      source_report_from: parsed.reportFrom ?? parsed.reportTo,
-      source_report_to: parsed.reportTo,
+      source_report_from: reportFrom,
+      source_report_to: reportTo,
       status: "pending",
     })
     .select("id")
@@ -173,8 +203,8 @@ async function importParsedPalmsChapterSummaryReport(
       records.push({
         member_id: match.matches[0].id,
         chapter_name: parsed.chapterName ?? "Unknown chapter",
-        report_from: parsed.reportFrom ?? parsed.reportTo,
-        report_to: parsed.reportTo,
+        report_from: reportFrom,
+        report_to: reportTo,
         run_at: parsed.runAt,
         present_count: match.row.presentCount,
         absent_count: match.row.absentCount,
@@ -242,13 +272,26 @@ async function importParsedPalmsChapterSummaryReport(
 export async function importPalmsChapterSummaryReports(
   files: Array<{ filename: string; xml: string }>,
 ): Promise<PalmsBatchImportResult> {
+  return importPalmsChapterSummaryReportsByMode(files, "monthly");
+}
+
+export async function importLifetimePalmsChapterSummaryReports(
+  files: Array<{ filename: string; xml: string }>,
+): Promise<PalmsBatchImportResult> {
+  return importPalmsChapterSummaryReportsByMode(files, "lifetime");
+}
+
+async function importPalmsChapterSummaryReportsByMode(
+  files: Array<{ filename: string; xml: string }>,
+  mode: PalmsImportMode,
+): Promise<PalmsBatchImportResult> {
   const results: PalmsBatchFileResult[] = [];
 
   for (const file of files) {
     try {
       const parsed = parsePalmsChapterSummaryReport(file.xml);
       const reportIdentity = buildPalmsReportIdentity(parsed);
-      const result = await importParsedPalmsChapterSummaryReport(parsed, file.filename);
+      const result = await importParsedPalmsChapterSummaryReport(parsed, file.filename, mode);
       const isDuplicate = result.importedCount === 0 && result.errors.some((error) => error.startsWith("Already imported:"));
 
       results.push({

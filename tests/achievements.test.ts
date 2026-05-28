@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMemberAchievements } from "../lib/renewals/achievements";
+import { buildMemberAchievements, selectLifetimePalmsSnapshot } from "../lib/renewals/achievements";
 import type { MemberPalmsSnapshot, MemberTrafficLight } from "../lib/types";
 
 const palmsSnapshot: MemberPalmsSnapshot = {
@@ -74,6 +74,21 @@ const trafficLights: MemberTrafficLight[] = [
 ];
 
 describe("buildMemberAchievements", () => {
+  it("prefers broad PALMS snapshots over newer exact monthly PALMS snapshots", () => {
+    const monthlySnapshot: MemberPalmsSnapshot = {
+      ...palmsSnapshot,
+      id: "palms-monthly",
+      report_from: "2026-04-01",
+      report_to: "2026-04-30",
+      present_count: 5,
+    };
+
+    const selectedSnapshot = selectLifetimePalmsSnapshot([palmsSnapshot, monthlySnapshot]);
+
+    expect(selectedSnapshot?.id).toBe("palms-1");
+    expect(selectedSnapshot?.present_count).toBe(100);
+  });
+
   it("prefers the latest PALMS snapshot when present", () => {
     const achievements = buildMemberAchievements(palmsSnapshot, trafficLights);
 

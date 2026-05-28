@@ -44,10 +44,15 @@ type QueuedPalmsFile = {
 export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverage }) {
   const router = useRouter();
   const palmsInputRef = useRef<HTMLInputElement | null>(null);
+  const lifetimePalmsInputRef = useRef<HTMLInputElement | null>(null);
   const [queuedPalmsFiles, setQueuedPalmsFiles] = useState<QueuedPalmsFile[]>([]);
   const [palmsSubmitting, setPalmsSubmitting] = useState(false);
   const [palmsResult, setPalmsResult] = useState<PalmsBatchResult | null>(null);
   const [palmsError, setPalmsError] = useState<string | null>(null);
+  const [queuedLifetimePalmsFiles, setQueuedLifetimePalmsFiles] = useState<QueuedPalmsFile[]>([]);
+  const [lifetimePalmsSubmitting, setLifetimePalmsSubmitting] = useState(false);
+  const [lifetimePalmsResult, setLifetimePalmsResult] = useState<PalmsBatchResult | null>(null);
+  const [lifetimePalmsError, setLifetimePalmsError] = useState<string | null>(null);
   const [duesSubmitting, setDuesSubmitting] = useState(false);
   const [duesResult, setDuesResult] = useState<ImportResult | null>(null);
   const [duesError, setDuesError] = useState<string | null>(null);
@@ -143,8 +148,60 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
     });
   }
 
+  async function queueLifetimePalmsFiles(files: FileList | File[]) {
+    const nextFiles = Array.from(files);
+    const nextQueued = await Promise.all(
+      nextFiles.map(async (file) => {
+        try {
+          const parsed = parsePalmsChapterSummaryReport(await file.text());
+          const isMonthly =
+            parsed.reportFrom && parsed.reportTo
+              ? isExactMonthlyPalmsWindow({
+                  report_from: parsed.reportFrom,
+                  report_to: parsed.reportTo,
+                })
+              : false;
+
+          return {
+            id: `${file.name}-${file.lastModified}`,
+            file,
+            chapterName: parsed.chapterName,
+            reportFrom: parsed.reportFrom,
+            reportTo: parsed.reportTo,
+            previewError: isMonthly
+              ? "This is a monthly PALMS file. Use the monthly PALMS upload instead."
+              : null,
+          } satisfies QueuedPalmsFile;
+        } catch (error) {
+          return {
+            id: `${file.name}-${file.lastModified}`,
+            file,
+            chapterName: null,
+            reportFrom: null,
+            reportTo: null,
+            previewError: error instanceof Error ? error.message : "Preview failed",
+          } satisfies QueuedPalmsFile;
+        }
+      }),
+    );
+
+    setQueuedLifetimePalmsFiles((currentFiles) => {
+      const byId = new Map(currentFiles.map((item) => [item.id, item]));
+
+      for (const file of nextQueued) {
+        byId.set(file.id, file);
+      }
+
+      return [...byId.values()];
+    });
+  }
+
   function removeQueuedPalmsFile(fileId: string) {
     setQueuedPalmsFiles((currentFiles) => currentFiles.filter((file) => file.id !== fileId));
+  }
+
+  function removeQueuedLifetimePalmsFile(fileId: string) {
+    setQueuedLifetimePalmsFiles((currentFiles) => currentFiles.filter((file) => file.id !== fileId));
   }
 
   async function submitPalmsImport(event: FormEvent<HTMLFormElement>) {
@@ -200,8 +257,141 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
     }
   }
 
+  async function submitLifetimePalmsImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLifetimePalmsSubmitting(true);
+    setLifetimePalmsError(null);
+    setLifetimePalmsResult(null);
+
+    if (queuedLifetimePalmsFiles.length === 0) {
+      setLifetimePalmsSubmitting(false);
+      setLifetimePalmsError("Select one or more PALMS .xls files first.");
+      return;
+    }
+
+    if (hasInvalidPalmsFiles(queuedLifetimePalmsFiles)) {
+      setLifetimePalmsSubmitting(false);
+      setLifetimePalmsError("Remove invalid PALMS files before importing.");
+      return;
+    }
+
+    const formData = new FormData();
+
+    for (const item of queuedLifetimePalmsFiles) {
+      formData.append("files", item.file);
+    }
+
+    const response = await fetch("/api/import/palms-lifetime", {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await response.json();
+
+    setLifetimePalmsSubmitting(false);
+
+    if (!response.ok) {
+      setLifetimePalmsError(payload.error ?? "Import failed");
+      return;
+    }
+
+    setLifetimePalmsResult(payload);
+    setQueuedLifetimePalmsFiles([]);
+    router.refresh();
+
+    if (lifetimePalmsInputRef.current) {
+      lifetimePalmsInputRef.current.value = "";
+    }
+  }
+
+  async function handleLifetimePalmsDrop(event: DragEvent<HTMLLabelElement>) {
+    event.preventDefault();
+    if (event.dataTransfer.files.length > 0) {
+      await queueLifetimePalmsFiles(event.dataTransfer.files);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      <form
+        onSubmit={submitLifetimePalmsImport}
+        className="space-y-4 rounded-md border border-[var(--line)] bg-white p-4"
+      >
+        <div>
+          <p className="text-sm font-semibold">PALMS lifetime chapter summary `.xls`</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Upload broad PALMS chapter summaries for lifetime achievements. Monthly PALMS files
+            should stay in the monthly upload below.
+          </p>
+        </div>
+        <label
+          className="block rounded-md border border-dashed border-[var(--line)] bg-[#f7f7f4] p-4"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={handleLifetimePalmsDrop}
+        >
+          <span className="text-sm font-medium">Lifetime PALMS reports `.xls`</span>
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            Drop broad date-range files here or browse to select many at once.
+          </p>
+          <input
+            ref={lifetimePalmsInputRef}
+            className="focus-ring mt-2 block w-full rounded-md border border-[var(--line)] p-2 text-sm"
+            name="files"
+            type="file"
+            accept=".xls"
+            multiple
+            onChange={(event) => {
+              if (event.target.files) {
+                void queueLifetimePalmsFiles(event.target.files);
+              }
+            }}
+          />
+        </label>
+        {queuedLifetimePalmsFiles.length > 0 ? (
+          <div className="rounded-md border border-[var(--line)] bg-[#f7f7f4] p-3 text-sm">
+            <p className="font-semibold">Queued lifetime PALMS files</p>
+            <ul className="mt-3 space-y-3">
+              {queuedLifetimePalmsFiles.map((item) => (
+                <li key={item.id} className="rounded-md border border-[var(--line)] bg-white p-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-medium">{item.file.name}</p>
+                      {item.previewError ? (
+                        <p className="mt-1 text-[var(--danger)]">{item.previewError}</p>
+                      ) : (
+                        <p className="mt-1 text-[var(--muted)]">
+                          {item.chapterName ?? "Unknown chapter"} | {formatDisplayDate(item.reportFrom)} to{" "}
+                          {formatDisplayDate(item.reportTo)}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      className="text-sm font-medium text-[var(--accent)] hover:underline"
+                      type="button"
+                      onClick={() => removeQueuedLifetimePalmsFile(item.id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        <button
+          className="focus-ring min-h-11 rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[var(--accent-contrast)] disabled:opacity-60"
+          disabled={
+            lifetimePalmsSubmitting ||
+            queuedLifetimePalmsFiles.length === 0 ||
+            hasInvalidPalmsFiles(queuedLifetimePalmsFiles)
+          }
+          type="submit"
+        >
+          {lifetimePalmsSubmitting ? "Importing..." : "Import lifetime PALMS summary"}
+        </button>
+
+        <PalmsImportFeedback result={lifetimePalmsResult} error={lifetimePalmsError} />
+      </form>
+
       <form
         onSubmit={submitPalmsImport}
         className="space-y-4 rounded-md border border-[var(--line)] bg-white p-4"

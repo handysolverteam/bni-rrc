@@ -13,6 +13,7 @@ import type {
   RenewalCycle,
   RenewalTask,
 } from "../types";
+import { selectLifetimePalmsSnapshot } from "./achievements";
 import { buildSponsorAchievementSummary } from "./sponsor-achievements";
 import { calculateStage, getDerivedRenewalDates, isWithinRenewalWorkWindow } from "./stage";
 import { buildTrainingAchievementSummary } from "./training-achievements";
@@ -138,11 +139,21 @@ async function getLatestPalmsSnapshotsByMember(
     throw error;
   }
 
-  const snapshots = new Map<string, MemberPalmsSnapshot>();
+  const snapshotsByMember = new Map<string, MemberPalmsSnapshot[]>();
 
   for (const row of (data ?? []) as MemberPalmsSnapshot[]) {
-    if (!snapshots.has(row.member_id)) {
-      snapshots.set(row.member_id, row);
+    const snapshots = snapshotsByMember.get(row.member_id) ?? [];
+    snapshots.push(row);
+    snapshotsByMember.set(row.member_id, snapshots);
+  }
+
+  const snapshots = new Map<string, MemberPalmsSnapshot>();
+
+  for (const [memberId, memberSnapshots] of snapshotsByMember) {
+    const selectedSnapshot = selectLifetimePalmsSnapshot(memberSnapshots);
+
+    if (selectedSnapshot) {
+      snapshots.set(memberId, selectedSnapshot);
     }
   }
 

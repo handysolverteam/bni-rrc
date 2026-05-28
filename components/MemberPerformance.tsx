@@ -50,7 +50,9 @@ export default function MemberPerformance({
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const trafficLightPerformance = buildPastYearPerformance(detail.currentCycle?.traffic_light_history ?? []);
-  const palmsPerformance = buildMonthlyPalmsPerformance(detail.palmsSnapshots);
+  const palmsPerformance = buildMonthlyPalmsPerformance(detail.palmsSnapshots, {
+    anchorDate: detail.performanceAnchorDate,
+  });
   const trainingPerformance = buildPastYearTrainingPerformance(
     detail.trainingAchievements,
     detail.performanceAnchorDate,

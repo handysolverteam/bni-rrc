@@ -80,6 +80,34 @@ describe("monthly PALMS performance", () => {
     expect(result.totals.tyfcb).toBe(12000);
   });
 
+  it("builds exact yearly totals from monthly PALMS files inside the anchor window", () => {
+    const snapshots = [
+      snapshot("2025-03-01", "2025-03-31", { present_count: 30 }),
+      snapshot("2025-04-01", "2025-04-30", { present_count: 4 }),
+      snapshot("2025-05-01", "2025-05-31", { present_count: 5 }),
+      snapshot("2025-06-01", "2025-06-30", { present_count: 6 }),
+      snapshot("2025-07-01", "2025-07-31", { present_count: 7 }),
+      snapshot("2025-08-01", "2025-08-31", { present_count: 8 }),
+      snapshot("2025-09-01", "2025-09-30", { present_count: 9 }),
+      snapshot("2025-10-01", "2025-10-31", { present_count: 10 }),
+      snapshot("2025-11-01", "2025-11-30", { present_count: 11 }),
+      snapshot("2025-12-01", "2025-12-31", { present_count: 12 }),
+      snapshot("2026-01-01", "2026-01-31", { present_count: 13 }),
+      snapshot("2026-02-01", "2026-02-28", { present_count: 14 }),
+      snapshot("2026-03-01", "2026-03-31", { present_count: 15 }),
+      snapshot("2026-04-01", "2026-04-30", { present_count: 40 }),
+    ];
+
+    const result = buildMonthlyPalmsPerformance(snapshots, { anchorDate: "2026-03-31" });
+
+    expect(result.monthsCovered).toBe(12);
+    expect(result.monthlySnapshots[0].report_to).toBe("2025-04-30");
+    expect(result.monthlySnapshots[11].report_to).toBe("2026-03-31");
+    expect(result.monthlySnapshots.map((item) => item.report_from)).not.toContain("2025-03-01");
+    expect(result.monthlySnapshots.map((item) => item.report_from)).not.toContain("2026-04-01");
+    expect(result.totals.presents).toBe(114);
+  });
+
   it("detects missing months between uploaded monthly PALMS windows", () => {
     const missingMonths = getMissingPalmsMonths([
       {

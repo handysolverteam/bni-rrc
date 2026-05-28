@@ -1,9 +1,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { validatePalmsReportWindow } from "../lib/renewals/palms-database-import";
 import {
   buildPalmsReportIdentity,
   matchPalmsRowMembers,
   parsePalmsChapterSummaryReport,
+  type ParsedPalmsReport,
 } from "../lib/renewals/palms-import";
 
 const sampleReport =
@@ -69,5 +71,38 @@ describe("parsePalmsChapterSummaryReport", () => {
     const parsed = parsePalmsChapterSummaryReport(readFileSync(sampleReport, "utf8"));
 
     expect(buildPalmsReportIdentity(parsed)).toBe("Influencers|2015-10-01|2026-03-31");
+  });
+});
+
+describe("validatePalmsReportWindow", () => {
+  const baseReport: ParsedPalmsReport = {
+    chapterName: "Influencers",
+    reportFrom: "2015-10-01",
+    reportTo: "2026-03-31",
+    runAt: null,
+    rows: [],
+  };
+
+  it("accepts broad PALMS windows for lifetime imports", () => {
+    expect(() => validatePalmsReportWindow(baseReport, "lifetime")).not.toThrow();
+  });
+
+  it("rejects broad PALMS windows for monthly imports", () => {
+    expect(() => validatePalmsReportWindow(baseReport, "monthly")).toThrow(
+      "This PALMS file is not a single calendar month.",
+    );
+  });
+
+  it("rejects exact monthly PALMS windows for lifetime imports", () => {
+    expect(() =>
+      validatePalmsReportWindow(
+        {
+          ...baseReport,
+          reportFrom: "2026-04-01",
+          reportTo: "2026-04-30",
+        },
+        "lifetime",
+      ),
+    ).toThrow("This is a monthly PALMS file. Use the monthly PALMS upload instead.");
   });
 });

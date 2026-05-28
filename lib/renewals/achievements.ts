@@ -1,4 +1,5 @@
 import type { MemberPalmsSnapshot, MemberTrafficLight } from "../types";
+import { isExactMonthlyPalmsSnapshot } from "./palms-monthly-performance";
 
 export type MemberAchievements = {
   source: "palms" | "traffic_lights" | "none";
@@ -27,6 +28,15 @@ export type MemberAchievements = {
   trainings: number;
   testimonials: number | null;
 };
+
+export function selectLifetimePalmsSnapshot(
+  snapshots: MemberPalmsSnapshot[],
+): MemberPalmsSnapshot | null {
+  const sorted = [...snapshots].sort((left, right) => right.report_to.localeCompare(left.report_to));
+  const lifetimeSnapshot = sorted.find((snapshot) => !isExactMonthlyPalmsSnapshot(snapshot));
+
+  return lifetimeSnapshot ?? sorted[0] ?? null;
+}
 
 export function buildMemberAchievements(
   palmsSnapshot: MemberPalmsSnapshot | null,
