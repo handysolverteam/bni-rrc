@@ -113,11 +113,17 @@ describe("buildMemberAchievementShareText", () => {
     expect(text).toContain("💰 TYFCB: ₹7,00,000");
     expect(text).toContain("🙌 Visitors: 50");
     expect(text).toContain("✅ Absences: 2");
+    expect(text).toContain("📊 Averages:");
+    expect(text).toContain("🤝 Referrals / week:");
+    expect(text).toContain("👥 1-to-1s / week:");
+    expect(text).toContain("🙌 Visitors / month:");
+    expect(text).toContain("📚 Trainings / month:");
     expect(text).toContain("🚦 Last 6 months:");
     expect(text).toContain("Mar 🟢 | Feb 🟡");
     expect(text).toContain("📌 Achievements updated till 31 Mar 2026");
-    expect(text).toContain("👏 Congratulations on the consistency and contribution!");
+    expect(text).not.toContain("Congratulations on the consistency and contribution");
     expect(text).toContain("Regards,\nRetention and Renewal Coordinators\nTeam Moneyfestation");
+    expect(text).not.toMatch(/Ã|ðŸ|â/);
   });
 
   it("falls back gracefully when roles, tenure, and history are missing", () => {
@@ -135,6 +141,8 @@ describe("buildMemberAchievementShareText", () => {
     expect(text).toContain("🔄 Renewal year unavailable");
     expect(text).toContain("📅 Member for Tenure not set | Joined Joining date not set");
     expect(text).toContain("✅ Absences: 0");
+    expect(text).toContain("📊 Averages:");
+    expect(text).toContain("🤝 Referrals / week: -");
     expect(text).toContain("Team Moneyfestation");
     expect(text).not.toContain("Last 6 months:");
   });
@@ -154,6 +162,7 @@ describe("buildMemberAchievementShareText", () => {
     expect(text).toContain("👥 1-to-1s done: -");
     expect(text).toContain("💰 TYFCB: ₹3,000");
     expect(text).toContain("🙌 Visitors: 3");
+    expect(text).toContain("📊 Averages:");
     expect(text).not.toContain("Achievements updated till");
   });
 });

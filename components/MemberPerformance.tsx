@@ -6,6 +6,7 @@ import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
 import { buildPastYearTrainingPerformance } from "@/lib/renewals/past-year-training-performance";
 import { buildMonthlyPalmsPerformance } from "@/lib/renewals/palms-monthly-performance";
 import { buildPastYearPerformance } from "@/lib/renewals/past-year-performance";
+import { buildPerformanceAverages } from "@/lib/renewals/performance-averages";
 import { buildMemberPerformanceShareText } from "@/lib/renewals/performance-share";
 import type {
   DashboardCycle,
@@ -66,6 +67,14 @@ export default function MemberPerformance({
   const trainingRange = `${formatDisplayDate(trainingPerformance.windowStart)} to ${formatDisplayDate(
     trainingPerformance.anchorDate,
   )}`;
+  const pastYearAverages = buildPerformanceAverages({
+    reportFrom: trainingPerformance.windowStart,
+    reportTo: trainingPerformance.anchorDate,
+    referralsGiven: palmsPerformance.totals.referralsGiven,
+    oneToOnes: palmsPerformance.totals.oneToOnes,
+    visitors: palmsPerformance.totals.visitors,
+    trainings: trainingPerformance.count,
+  });
   const trafficLightRange =
     trafficLightPerformance.history.length > 0
       ? `${formatDisplayMonth(
@@ -186,6 +195,29 @@ export default function MemberPerformance({
         <StatCard label="Absences" value={formatNumber(palmsPerformance.totals.absences)} />
         <StatCard label="1-to-1s" value={formatNumber(palmsPerformance.totals.oneToOnes)} />
         <StatCard label="CEU" value={formatNumber(palmsPerformance.totals.ceu)} />
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Avg referrals / week"
+          value={formatNumber(pastYearAverages.referralsGivenPerWeek)}
+          emphasize
+        />
+        <StatCard
+          label="Avg 1-to-1s / week"
+          value={formatNumber(pastYearAverages.oneToOnesPerWeek)}
+          emphasize
+        />
+        <StatCard
+          label="Avg visitors / month"
+          value={formatNumber(pastYearAverages.visitorsPerMonth)}
+          emphasize
+        />
+        <StatCard
+          label="Avg trainings / month"
+          value={formatNumber(pastYearAverages.trainingsPerMonth)}
+          emphasize
+        />
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
@@ -334,10 +366,26 @@ export default function MemberPerformance({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({
+  label,
+  value,
+  emphasize = false,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
   return (
-    <div className="rounded-md border border-[var(--line)] bg-white p-4">
-      <p className="text-sm text-[var(--muted)]">{label}</p>
+    <div
+      className={`rounded-md border p-4 ${
+        emphasize
+          ? "border-[var(--accent)] bg-[#eef1ea]"
+          : "border-[var(--line)] bg-white"
+      }`}
+    >
+      <p className={`text-sm ${emphasize ? "font-medium text-[var(--accent)]" : "text-[var(--muted)]"}`}>
+        {label}
+      </p>
       <p className="mt-2 text-2xl font-semibold tracking-normal text-[var(--accent)]">{value}</p>
     </div>
   );

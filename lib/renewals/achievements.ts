@@ -1,5 +1,6 @@
 import type { MemberPalmsSnapshot, MemberTrafficLight } from "../types";
 import { isExactMonthlyPalmsSnapshot } from "./palms-monthly-performance";
+import { buildPerformanceAverages, type PerformanceAverages } from "./performance-averages";
 
 export type MemberAchievements = {
   source: "palms" | "traffic_lights" | "none";
@@ -27,6 +28,7 @@ export type MemberAchievements = {
   ceu: number | null;
   trainings: number;
   testimonials: number | null;
+  averages: PerformanceAverages;
 };
 
 export function selectLifetimePalmsSnapshot(
@@ -70,6 +72,14 @@ export function buildMemberAchievements(
       ceu: palmsSnapshot.ceu,
       trainings: palmsSnapshot.trainings,
       testimonials: null,
+      averages: buildPerformanceAverages({
+        reportFrom: palmsSnapshot.report_from,
+        reportTo: palmsSnapshot.report_to,
+        referralsGiven: palmsSnapshot.referrals_given_inside + palmsSnapshot.referrals_given_outside,
+        oneToOnes: palmsSnapshot.one_to_ones,
+        visitors: palmsSnapshot.visitors,
+        trainings: palmsSnapshot.trainings,
+      }),
     };
   }
 
@@ -94,10 +104,18 @@ export function buildMemberAchievements(
       ceu: null,
       trainings: 0,
       testimonials: null,
+      averages: buildPerformanceAverages({
+        reportFrom: null,
+        reportTo: null,
+        referralsGiven: 0,
+        oneToOnes: null,
+        visitors: 0,
+        trainings: 0,
+      }),
     };
   }
 
-  return trafficLightHistory.reduce<MemberAchievements>(
+  const trafficLightSummary = trafficLightHistory.reduce<MemberAchievements>(
     (summary, trafficLight) => ({
       ...summary,
       source: "traffic_lights",
@@ -140,6 +158,26 @@ export function buildMemberAchievements(
       ceu: null,
       trainings: 0,
       testimonials: 0,
+      averages: buildPerformanceAverages({
+        reportFrom: null,
+        reportTo: null,
+        referralsGiven: 0,
+        oneToOnes: null,
+        visitors: 0,
+        trainings: 0,
+      }),
     },
   );
+
+  return {
+    ...trafficLightSummary,
+    averages: buildPerformanceAverages({
+      reportFrom: trafficLightSummary.reportFrom,
+      reportTo: trafficLightSummary.reportTo,
+      referralsGiven: trafficLightSummary.referrals.givenTotal,
+      oneToOnes: trafficLightSummary.oneToOnes,
+      visitors: trafficLightSummary.visitors,
+      trainings: trafficLightSummary.trainings,
+    }),
+  };
 }

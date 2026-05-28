@@ -216,6 +216,29 @@ export default function MemberAchievements({ detail }: { detail: MemberAchieveme
         <AchievementCard label="Total TYFCB" value={formatCurrency(achievements.tyfcb)} />
       </section>
 
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <AchievementCard
+          label="Avg referrals / week"
+          value={formatNumber(achievements.averages.referralsGivenPerWeek)}
+          emphasize
+        />
+        <AchievementCard
+          label="Avg 1-to-1s / week"
+          value={formatNumber(achievements.averages.oneToOnesPerWeek)}
+          emphasize
+        />
+        <AchievementCard
+          label="Avg visitors / month"
+          value={formatNumber(achievements.averages.visitorsPerMonth)}
+          emphasize
+        />
+        <AchievementCard
+          label="Avg trainings / month"
+          value={formatNumber(achievements.averages.trainingsPerMonth)}
+          emphasize
+        />
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-2">
         <AchievementCard
           label="Sponsors (lifetime)"

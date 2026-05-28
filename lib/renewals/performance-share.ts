@@ -2,6 +2,7 @@ import { formatDisplayDate, formatDisplayMonth } from "../date-format";
 import type { MonthlyPalmsPerformance } from "./palms-monthly-performance";
 import type { PastYearPerformance } from "./past-year-performance";
 import type { PastYearTrainingPerformance } from "./past-year-training-performance";
+import { buildPerformanceAverages } from "./performance-averages";
 
 function formatNumber(value: number | null): string {
   if (value === null) {
@@ -33,12 +34,12 @@ function formatTrafficLightSummary(performance: PastYearPerformance): string | n
     .map((trafficLight) => {
       const colorEmoji =
         trafficLight.color === "green"
-          ? "ðŸŸ¢"
+          ? "🟢"
           : trafficLight.color === "yellow"
-            ? "ðŸŸ¡"
+            ? "🟡"
             : trafficLight.color === "red"
-              ? "ðŸ”´"
-              : "âšª";
+              ? "🔴"
+              : "⚪";
 
       const label = trafficLight.report_window_end ?? trafficLight.report_month;
       return `${formatDisplayMonth(label).split(" ")[0]} ${trafficLight.score} ${colorEmoji}`;
@@ -63,39 +64,54 @@ export function buildMemberPerformanceShareText({
   trafficLightPerformance: PastYearPerformance;
   trafficLightRange: string | null;
 }): string {
+  const averages = buildPerformanceAverages({
+    reportFrom: trainingPerformance.windowStart,
+    reportTo: trainingPerformance.anchorDate,
+    referralsGiven: palmsPerformance.totals.referralsGiven,
+    oneToOnes: palmsPerformance.totals.oneToOnes,
+    visitors: palmsPerformance.totals.visitors,
+    trainings: trainingPerformance.count,
+  });
   const lines = [
-    `ðŸŒŸ Past year performance of ${memberName} ðŸŒŸ`,
+    `🌟 Past year performance of ${memberName} 🌟`,
     "",
-    `ðŸ“… Monthly PALMS coverage: ${palmsPerformance.monthsCovered} month${palmsPerformance.monthsCovered === 1 ? "" : "s"}`,
+    `📅 Monthly PALMS coverage: ${palmsPerformance.monthsCovered} month${palmsPerformance.monthsCovered === 1 ? "" : "s"}`,
   ];
 
   if (palmsRange) {
-    lines.push(`ðŸ“Œ PALMS range: ${palmsRange}`);
+    lines.push(`📌 PALMS range: ${palmsRange}`);
   }
 
   if (trafficLightRange) {
-    lines.push(`ðŸš¦ Traffic-light range: ${trafficLightRange}`);
+    lines.push(`🚦 Traffic-light range: ${trafficLightRange}`);
   }
 
   if (trainingRange) {
-    lines.push(`ðŸ“š Training range: ${trainingRange}`);
+    lines.push(`📚 Training range: ${trainingRange}`);
   }
 
   lines.push("");
-  lines.push(`ðŸ¤ Referrals given: ${formatNumber(palmsPerformance.totals.referralsGiven)}`);
-  lines.push(`ðŸ“¥ Referrals received: ${formatNumber(palmsPerformance.totals.referralsReceived)}`);
-  lines.push(`ðŸ™Œ Visitors: ${formatNumber(palmsPerformance.totals.visitors)}`);
-  lines.push(`ðŸ‘¥ 1-to-1s: ${formatNumber(palmsPerformance.totals.oneToOnes)}`);
-  lines.push(`ðŸ’° TYFCB: ${formatCurrency(palmsPerformance.totals.tyfcb)}`);
-  lines.push(`âœ… Presents: ${formatNumber(palmsPerformance.totals.presents)}`);
-  lines.push(`âš ï¸ Absences: ${formatNumber(palmsPerformance.totals.absences)}`);
-  lines.push(`ðŸŽ“ CEU: ${formatNumber(palmsPerformance.totals.ceu)}`);
-  lines.push(`ðŸ“š Trainings: ${formatNumber(trainingPerformance.count)}`);
+  lines.push(`🤝 Referrals given: ${formatNumber(palmsPerformance.totals.referralsGiven)}`);
+  lines.push(`📥 Referrals received: ${formatNumber(palmsPerformance.totals.referralsReceived)}`);
+  lines.push(`🙌 Visitors: ${formatNumber(palmsPerformance.totals.visitors)}`);
+  lines.push(`👥 1-to-1s: ${formatNumber(palmsPerformance.totals.oneToOnes)}`);
+  lines.push(`💰 TYFCB: ${formatCurrency(palmsPerformance.totals.tyfcb)}`);
+  lines.push(`✅ Presents: ${formatNumber(palmsPerformance.totals.presents)}`);
+  lines.push(`⚠️ Absences: ${formatNumber(palmsPerformance.totals.absences)}`);
+  lines.push(`🎓 CEU: ${formatNumber(palmsPerformance.totals.ceu)}`);
+  lines.push(`📚 Trainings: ${formatNumber(trainingPerformance.count)}`);
+
+  lines.push("");
+  lines.push("📊 Averages:");
+  lines.push(`🤝 Referrals / week: ${formatNumber(averages.referralsGivenPerWeek)}`);
+  lines.push(`👥 1-to-1s / week: ${formatNumber(averages.oneToOnesPerWeek)}`);
+  lines.push(`🙌 Visitors / month: ${formatNumber(averages.visitorsPerMonth)}`);
+  lines.push(`📚 Trainings / month: ${formatNumber(averages.trainingsPerMonth)}`);
 
   if (trafficLightPerformance.snapshotsCovered > 0) {
     lines.push("");
     lines.push(
-      `ðŸ“ˆ Traffic-light score: Avg ${formatNumber(trafficLightPerformance.scores.average)} | Best ${formatNumber(trafficLightPerformance.scores.best)} | Worst ${formatNumber(trafficLightPerformance.scores.worst)}`,
+      `📈 Traffic-light score: Avg ${formatNumber(trafficLightPerformance.scores.average)} | Best ${formatNumber(trafficLightPerformance.scores.best)} | Worst ${formatNumber(trafficLightPerformance.scores.worst)}`,
     );
   }
 
@@ -103,21 +119,19 @@ export function buildMemberPerformanceShareText({
 
   if (trafficLightSummary) {
     lines.push("");
-    lines.push("ðŸš¦ Last 12 traffic-light snapshots:");
+    lines.push("🚦 Last 12 traffic-light snapshots:");
     lines.push(trafficLightSummary);
   }
 
   if (palmsPerformance.monthlySnapshots.length > 0) {
     lines.push("");
     lines.push(
-      `ðŸ—“ï¸ Performance updated till ${formatDisplayDate(
+      `🗓️ Performance updated till ${formatDisplayDate(
         palmsPerformance.monthlySnapshots[palmsPerformance.monthlySnapshots.length - 1].report_to,
       )}`,
     );
   }
 
-  lines.push("");
-  lines.push("ðŸ‘ Congratulations on the consistency and contribution!");
   lines.push("");
   lines.push("Regards,");
   lines.push("Retention and Renewal Coordinators");

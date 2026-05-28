@@ -140,23 +140,30 @@ describe("buildMemberPerformanceShareText", () => {
       trafficLightRange: "Sep 2025 to Mar 2026",
     });
 
-    expect(text).toContain("Past year performance of Viraj Bansal");
-    expect(text).toContain("Monthly PALMS coverage: 2 months");
-    expect(text).toContain("PALMS range: 1 Feb 2026 to 31 Mar 2026");
-    expect(text).toContain("Traffic-light range: Sep 2025 to Mar 2026");
-    expect(text).toContain("Training range: 1 Apr 2025 to 31 Mar 2026");
-    expect(text).toContain("Referrals given: 14");
-    expect(text).toContain("Referrals received: 12");
-    expect(text).toContain("Visitors: 5");
-    expect(text).toContain("1-to-1s: 13");
-    expect(text).toContain("CEU: 3");
-    expect(text).toContain("Trainings: 1");
-    expect(text).toContain("Traffic-light score: Avg 62.5 | Best 70 | Worst 55");
-    expect(text).toContain("Last 12 traffic-light snapshots:");
-    expect(text).toContain("Mar 70");
-    expect(text).toContain("Feb 55");
-    expect(text).toContain("Performance updated till 31 Mar 2026");
+    expect(text).toContain("🌟 Past year performance of Viraj Bansal 🌟");
+    expect(text).toContain("📅 Monthly PALMS coverage: 2 months");
+    expect(text).toContain("📌 PALMS range: 1 Feb 2026 to 31 Mar 2026");
+    expect(text).toContain("🚦 Traffic-light range: Sep 2025 to Mar 2026");
+    expect(text).toContain("📚 Training range: 1 Apr 2025 to 31 Mar 2026");
+    expect(text).toContain("🤝 Referrals given: 14");
+    expect(text).toContain("📥 Referrals received: 12");
+    expect(text).toContain("🙌 Visitors: 5");
+    expect(text).toContain("👥 1-to-1s: 13");
+    expect(text).toContain("🎓 CEU: 3");
+    expect(text).toContain("📚 Trainings: 1");
+    expect(text).toContain("📊 Averages:");
+    expect(text).toContain("🤝 Referrals / week: 0.27");
+    expect(text).toContain("👥 1-to-1s / week: 0.25");
+    expect(text).toContain("🙌 Visitors / month: 0.42");
+    expect(text).toContain("📚 Trainings / month: 0.08");
+    expect(text).toContain("📈 Traffic-light score: Avg 62.5 | Best 70 | Worst 55");
+    expect(text).toContain("🚦 Last 12 traffic-light snapshots:");
+    expect(text).toContain("Mar 70 🟢");
+    expect(text).toContain("Feb 55 🟡");
+    expect(text).toContain("🗓️ Performance updated till 31 Mar 2026");
     expect(text).toContain("Regards,\nRetention and Renewal Coordinators\nTeam Moneyfestation");
+    expect(text).not.toContain("Congratulations on the consistency and contribution");
+    expect(text).not.toMatch(/Ã|ðŸ|â/);
   });
 
   it("falls back gracefully when yearly data is missing", () => {
@@ -170,9 +177,10 @@ describe("buildMemberPerformanceShareText", () => {
       trafficLightRange: null,
     });
 
-    expect(text).toContain("Monthly PALMS coverage: 0 months");
-    expect(text).toContain("Referrals given: 0");
-    expect(text).toContain("Trainings: 0");
+    expect(text).toContain("📅 Monthly PALMS coverage: 0 months");
+    expect(text).toContain("🤝 Referrals given: 0");
+    expect(text).toContain("📚 Trainings: 0");
+    expect(text).toContain("📊 Averages:");
     expect(text).not.toContain("Last 12 traffic-light snapshots:");
     expect(text).not.toContain("Performance updated till");
   });

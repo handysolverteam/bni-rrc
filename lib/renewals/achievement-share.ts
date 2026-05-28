@@ -77,6 +77,12 @@ export function buildMemberAchievementShareText({
     `💰 TYFCB: ${formatCurrency(achievements.tyfcb)}`,
     `🙌 Visitors: ${formatNumber(achievements.visitors)}`,
     `✅ Absences: ${formatNumber(achievements.attendance.absences)}`,
+    "",
+    "📊 Averages:",
+    `🤝 Referrals / week: ${formatNumber(achievements.averages.referralsGivenPerWeek)}`,
+    `👥 1-to-1s / week: ${formatNumber(achievements.averages.oneToOnesPerWeek)}`,
+    `🙌 Visitors / month: ${formatNumber(achievements.averages.visitorsPerMonth)}`,
+    `📚 Trainings / month: ${formatNumber(achievements.averages.trainingsPerMonth)}`,
   ];
 
   const trafficLightSummary = formatTrafficLightSummary(trafficLightHistory);
@@ -92,8 +98,6 @@ export function buildMemberAchievementShareText({
     lines.push(`📌 Achievements updated till ${formatDisplayDate(achievements.reportTo)}`);
   }
 
-  lines.push("");
-  lines.push("👏 Congratulations on the consistency and contribution!");
   lines.push("");
   lines.push("Regards,");
   lines.push("Retention and Renewal Coordinators");
