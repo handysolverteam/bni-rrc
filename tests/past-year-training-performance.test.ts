@@ -60,4 +60,35 @@ describe("buildPastYearTrainingPerformance", () => {
     expect(performance.count).toBe(0);
     expect(performance.items).toEqual([]);
   });
+
+  it("uses inclusive six-month boundaries", () => {
+    const performance = buildPastYearTrainingPerformance(
+      [
+        { ...trainingAchievements[0], id: "before", event_date: "2025-09-30" },
+        { ...trainingAchievements[0], id: "start", event_date: "2025-10-01" },
+        { ...trainingAchievements[0], id: "anchor", event_date: "2026-03-31" },
+        { ...trainingAchievements[0], id: "after", event_date: "2026-04-01" },
+      ],
+      "2026-03-31",
+      6,
+    );
+
+    expect(performance.windowStart).toBe("2025-10-01");
+    expect(performance.anchorDate).toBe("2026-03-31");
+    expect(performance.items.map((item) => item.id)).toEqual(["anchor", "start"]);
+  });
+
+  it("handles six-month windows anchored at the end of a longer month", () => {
+    const performance = buildPastYearTrainingPerformance(
+      [
+        { ...trainingAchievements[0], id: "outside", event_date: "2025-02-28" },
+        { ...trainingAchievements[0], id: "inside", event_date: "2025-03-01" },
+      ],
+      "2025-08-31",
+      6,
+    );
+
+    expect(performance.windowStart).toBe("2025-03-01");
+    expect(performance.items.map((item) => item.id)).toEqual(["inside"]);
+  });
 });

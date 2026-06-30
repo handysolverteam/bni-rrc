@@ -184,4 +184,30 @@ describe("buildMemberPerformanceShareText", () => {
     expect(text).not.toContain("Last 12 traffic-light snapshots:");
     expect(text).not.toContain("Performance updated till");
   });
+
+  it("labels the six-month WhatsApp summary and traffic-light history", () => {
+    const text = buildMemberPerformanceShareText({
+      memberName: "Viraj Bansal",
+      periodMonths: 6,
+      palmsPerformance: buildMonthlyPalmsPerformance(palmsSnapshots, {
+        anchorDate: "2026-03-31",
+        limit: 6,
+        windowMonths: 6,
+      }),
+      palmsRange: "1 Oct 2025 to 31 Mar 2026",
+      trainingPerformance: buildPastYearTrainingPerformance(
+        trainingAchievements,
+        "2026-03-31",
+        6,
+      ),
+      trainingRange: "1 Oct 2025 to 31 Mar 2026",
+      trafficLightPerformance: buildPastYearPerformance(trafficLights, 6),
+      trafficLightRange: "Oct 2025 to Mar 2026",
+    });
+
+    expect(text).toContain("🌟 Past 6 months performance of Viraj Bansal 🌟");
+    expect(text).toContain("🚦 Last 6 traffic-light snapshots:");
+    expect(text).not.toContain("Past year performance");
+    expect(text).not.toContain("Last 12 traffic-light snapshots:");
+  });
 });

@@ -1,4 +1,5 @@
 import type { MemberTrainingAchievement } from "../types";
+import { getPerformanceWindow } from "./performance-window";
 
 export type PastYearTrainingPerformance = {
   count: number;
@@ -7,26 +8,19 @@ export type PastYearTrainingPerformance = {
   items: MemberTrainingAchievement[];
 };
 
-function parseDateOnly(date: string): Date {
-  return new Date(`${date}T00:00:00.000Z`);
-}
-
-function formatDateOnly(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 export function buildPastYearTrainingPerformance(
   trainingAchievements: MemberTrainingAchievement[],
   anchorDateInput: string | Date,
+  periodMonths = 12,
 ): PastYearTrainingPerformance {
-  const anchorDate =
-    typeof anchorDateInput === "string" ? parseDateOnly(anchorDateInput) : new Date(anchorDateInput);
-  const windowStartDate = new Date(anchorDate);
-  windowStartDate.setUTCFullYear(windowStartDate.getUTCFullYear() - 1);
-  windowStartDate.setUTCDate(windowStartDate.getUTCDate() + 1);
+  const performanceWindow = getPerformanceWindow(anchorDateInput, periodMonths);
 
-  const anchorDateText = formatDateOnly(anchorDate);
-  const windowStartText = formatDateOnly(windowStartDate);
+  if (!performanceWindow) {
+    throw new Error("A valid performance anchor date and period are required");
+  }
+
+  const anchorDateText = performanceWindow.anchorDate;
+  const windowStartText = performanceWindow.windowStart;
 
   const items = [...trainingAchievements]
     .filter(

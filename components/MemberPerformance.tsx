@@ -39,6 +39,7 @@ function formatCurrency(value: number | null): string {
 
 export default function MemberPerformance({
   detail,
+  periodMonths = 12,
 }: {
   detail: {
     member: Member;
@@ -47,16 +48,25 @@ export default function MemberPerformance({
     trainingAchievements: MemberTrainingAchievement[];
     performanceAnchorDate: string;
   };
+  periodMonths?: 6 | 12;
 }) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
-  const trafficLightPerformance = buildPastYearPerformance(detail.currentCycle?.traffic_light_history ?? []);
+  const periodLabel = periodMonths === 12 ? "Past year performance" : `Past ${periodMonths} months performance`;
+  const periodTotalsLabel = periodMonths === 12 ? "yearly" : `${periodMonths}-month`;
+  const trafficLightPerformance = buildPastYearPerformance(
+    detail.currentCycle?.traffic_light_history ?? [],
+    periodMonths,
+  );
   const palmsPerformance = buildMonthlyPalmsPerformance(detail.palmsSnapshots, {
     anchorDate: detail.performanceAnchorDate,
+    limit: periodMonths,
+    windowMonths: periodMonths,
   });
   const trainingPerformance = buildPastYearTrainingPerformance(
     detail.trainingAchievements,
     detail.performanceAnchorDate,
+    periodMonths,
   );
   const palmsRange =
     palmsPerformance.monthlySnapshots.length > 0
@@ -67,7 +77,7 @@ export default function MemberPerformance({
   const trainingRange = `${formatDisplayDate(trainingPerformance.windowStart)} to ${formatDisplayDate(
     trainingPerformance.anchorDate,
   )}`;
-  const pastYearAverages = buildPerformanceAverages({
+  const performanceAverages = buildPerformanceAverages({
     reportFrom: trainingPerformance.windowStart,
     reportTo: trainingPerformance.anchorDate,
     referralsGiven: palmsPerformance.totals.referralsGiven,
@@ -88,6 +98,7 @@ export default function MemberPerformance({
       : null;
   const shareText = buildMemberPerformanceShareText({
     memberName: detail.member.name,
+    periodMonths,
     palmsPerformance,
     palmsRange,
     trainingPerformance,
@@ -120,7 +131,7 @@ export default function MemberPerformance({
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
-              <p className="text-sm font-medium text-[var(--accent)]">Past year performance</p>
+              <p className="text-sm font-medium text-[var(--accent)]">{periodLabel}</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-normal">{detail.member.name}</h1>
               <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.industry || "No industry"}</p>
               <p className="mt-1 text-sm text-[var(--muted)]">{detail.member.report_role || "No report role"}</p>
@@ -133,7 +144,7 @@ export default function MemberPerformance({
                 {formatDisplayMonth(trainingPerformance.anchorDate)}
               </p>
               <p className="mt-1 text-sm text-[var(--muted)]">
-                Past-year training window aligned to latest report date
+                {periodLabel} training window aligned to latest report date
               </p>
               <p className="mt-1 text-sm font-medium text-[var(--accent)]">{trainingRange}</p>
             </div>
@@ -145,7 +156,7 @@ export default function MemberPerformance({
                   Share On WhatsApp
                 </p>
                 <p className="mt-1 text-sm text-[var(--muted)]">
-                  Ready-to-share past year performance summary with yearly totals and traffic-light trend.
+                  Ready-to-share {periodLabel.toLowerCase()} summary with {periodTotalsLabel} totals and traffic-light trend.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -182,7 +193,10 @@ export default function MemberPerformance({
               </div>
             ) : null}
           </div>
-          <MemberSectionNav active="performance" memberId={detail.member.id} />
+          <MemberSectionNav
+            active={periodMonths === 6 ? "performance-six-months" : "performance"}
+            memberId={detail.member.id}
+          />
         </div>
       </section>
 
@@ -200,22 +214,22 @@ export default function MemberPerformance({
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Avg referrals / week"
-          value={formatNumber(pastYearAverages.referralsGivenPerWeek)}
+          value={formatNumber(performanceAverages.referralsGivenPerWeek)}
           emphasize
         />
         <StatCard
           label="Avg 1-to-1s / week"
-          value={formatNumber(pastYearAverages.oneToOnesPerWeek)}
+          value={formatNumber(performanceAverages.oneToOnesPerWeek)}
           emphasize
         />
         <StatCard
           label="Avg visitors / month"
-          value={formatNumber(pastYearAverages.visitorsPerMonth)}
+          value={formatNumber(performanceAverages.visitorsPerMonth)}
           emphasize
         />
         <StatCard
           label="Avg trainings / month"
-          value={formatNumber(pastYearAverages.trainingsPerMonth)}
+          value={formatNumber(performanceAverages.trainingsPerMonth)}
           emphasize
         />
       </section>
@@ -358,7 +372,7 @@ export default function MemberPerformance({
           </div>
         ) : (
           <p className="mt-3 text-sm text-[var(--muted)]">
-            Upload exact monthly PALMS `.xls` files to see true month-by-month yearly totals here.
+            Upload exact monthly PALMS `.xls` files to see true month-by-month {periodTotalsLabel} totals here.
           </p>
         )}
       </section>

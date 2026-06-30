@@ -65,4 +65,23 @@ describe("buildPastYearPerformance", () => {
     expect(result.snapshotsCovered).toBe(0);
     expect(result.scores.average).toBeNull();
   });
+
+  it("aggregates only the latest six traffic-light snapshots when requested", () => {
+    const history = [
+      "2025-06-01",
+      "2025-07-01",
+      "2025-08-01",
+      "2025-09-01",
+      "2025-10-01",
+      "2025-11-01",
+      "2025-12-01",
+    ].map((month, index) => trafficLight(month, { score: 40 + index }));
+
+    const result = buildPastYearPerformance(history, 6);
+
+    expect(result.snapshotsCovered).toBe(6);
+    expect(result.history[0].report_month).toBe("2025-07-01");
+    expect(result.history[5].report_month).toBe("2025-12-01");
+    expect(result.scores.average).toBe(43.5);
+  });
 });

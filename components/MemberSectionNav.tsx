@@ -7,15 +7,20 @@ export default function MemberSectionNav({
   active,
 }: {
   memberId: string;
-  active: "achievements" | "performance";
+  active: "achievements" | "performance-six-months" | "performance";
 }) {
   const links = [
     { id: "achievements" as const, href: `/members/${memberId}/achievements`, label: "Achievements" },
+    {
+      id: "performance-six-months" as const,
+      href: `/members/${memberId}/performance/6-months`,
+      label: "Past 6 Months Performance",
+    },
     { id: "performance" as const, href: `/members/${memberId}/performance`, label: "Past Year Performance" },
   ];
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <nav aria-label="Member sections" className="flex flex-wrap gap-2">
       {links.map((link) => (
         <Link
           key={link.id}
@@ -29,6 +34,6 @@ export default function MemberSectionNav({
           {link.label}
         </Link>
       ))}
-    </div>
+    </nav>
   );
 }

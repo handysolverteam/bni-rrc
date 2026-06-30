@@ -11,10 +11,13 @@ export type PastYearPerformance = {
   };
 };
 
-export function buildPastYearPerformance(history: MemberTrafficLight[]): PastYearPerformance {
+export function buildPastYearPerformance(
+  history: MemberTrafficLight[],
+  snapshotLimit = PAST_YEAR_TRAFFIC_LIGHT_LIMIT,
+): PastYearPerformance {
   const selectedHistory = [...history]
     .sort((left, right) => right.report_month.localeCompare(left.report_month))
-    .slice(0, PAST_YEAR_TRAFFIC_LIGHT_LIMIT);
+    .slice(0, snapshotLimit);
 
   const displayHistory = sortTrafficLightHistoryForDisplay(selectedHistory);
   const monthsCovered = selectedHistory.length;

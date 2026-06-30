@@ -49,6 +49,7 @@ function formatTrafficLightSummary(performance: PastYearPerformance): string | n
 
 export function buildMemberPerformanceShareText({
   memberName,
+  periodMonths = 12,
   palmsPerformance,
   palmsRange,
   trainingPerformance,
@@ -57,6 +58,7 @@ export function buildMemberPerformanceShareText({
   trafficLightRange,
 }: {
   memberName: string;
+  periodMonths?: 6 | 12;
   palmsPerformance: MonthlyPalmsPerformance;
   palmsRange: string | null;
   trainingPerformance: PastYearTrainingPerformance;
@@ -73,7 +75,7 @@ export function buildMemberPerformanceShareText({
     trainings: trainingPerformance.count,
   });
   const lines = [
-    `🌟 Past year performance of ${memberName} 🌟`,
+    `🌟 ${periodMonths === 12 ? "Past year" : `Past ${periodMonths} months`} performance of ${memberName} 🌟`,
     "",
     `📅 Monthly PALMS coverage: ${palmsPerformance.monthsCovered} month${palmsPerformance.monthsCovered === 1 ? "" : "s"}`,
   ];
@@ -119,7 +121,7 @@ export function buildMemberPerformanceShareText({
 
   if (trafficLightSummary) {
     lines.push("");
-    lines.push("🚦 Last 12 traffic-light snapshots:");
+    lines.push(`🚦 Last ${periodMonths} traffic-light snapshots:`);
     lines.push(trafficLightSummary);
   }
 
