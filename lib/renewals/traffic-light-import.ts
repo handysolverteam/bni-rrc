@@ -2,6 +2,7 @@ import { getServiceSupabase } from "../supabase/server";
 import type { Member } from "../types";
 import { normalizeImportKey } from "./import";
 import {
+  parseTrafficLightPdfScoreReport,
   parseTrafficLightReport,
   parseTrafficLightXlsxReport,
   type ParsedTrafficLightScoreReport,
@@ -219,19 +220,18 @@ export async function importTrafficLightReport(
   }
 }
 
-export async function importTrafficLightXlsxReport(
-  buffer: Buffer,
+async function importTrafficLightScoreReport(
+  parsed: ParsedTrafficLightScoreReport,
   filename: string,
-  reportMonthOverride?: string | null,
+  sourceType: "traffic_lights_pdf" | "traffic_lights_xlsx",
 ): Promise<TrafficLightImportResult> {
   const supabase = getServiceSupabase();
-  const parsed = parseTrafficLightXlsxReport(buffer, normalizeReportMonth(reportMonthOverride ?? null));
   const errors: string[] = [];
   const batch = await createTrafficLightImportBatch({
     filename,
     reportMonth: parsed.reportMonth,
     reportWindowStart: parsed.reportWindowStart,
-    sourceType: "traffic_lights_xlsx",
+    sourceType,
   });
 
   let importedCount = 0;
@@ -363,4 +363,22 @@ export async function importTrafficLightXlsxReport(
 
     throw error;
   }
+}
+
+export async function importTrafficLightPdfScoreReport(
+  text: string,
+  filename: string,
+  reportMonthOverride?: string | null,
+): Promise<TrafficLightImportResult> {
+  const parsed = parseTrafficLightPdfScoreReport(text, normalizeReportMonth(reportMonthOverride ?? null));
+  return importTrafficLightScoreReport(parsed, filename, "traffic_lights_pdf");
+}
+
+export async function importTrafficLightXlsxReport(
+  buffer: Buffer,
+  filename: string,
+  reportMonthOverride?: string | null,
+): Promise<TrafficLightImportResult> {
+  const parsed = parseTrafficLightXlsxReport(buffer, normalizeReportMonth(reportMonthOverride ?? null));
+  return importTrafficLightScoreReport(parsed, filename, "traffic_lights_xlsx");
 }

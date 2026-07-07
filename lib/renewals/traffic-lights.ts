@@ -92,14 +92,18 @@ function parseMonthToken(month: string, year: string): string {
   return `20${year}-${monthIndex}-01`;
 }
 
-function parseTrafficLightXlsxTitleMonth(title: string): string {
+function parseTrafficLightScoreTitleMonth(title: string): string {
   const match = title.match(/\bFOR\s+([A-Z]+)\s+'?(\d{2})\b/i);
 
   if (!match) {
-    throw new Error("Traffic-light XLSX report month was not found.");
+    throw new Error("Traffic-light score report month was not found.");
   }
 
   return parseMonthToken(match[1], match[2]);
+}
+
+function parseTrafficLightXlsxTitleMonth(title: string): string {
+  return parseTrafficLightScoreTitleMonth(title);
 }
 
 export function parseTrafficLightReportMonth(text: string): string {
@@ -244,6 +248,78 @@ export function parseTrafficLightReport(
 
 function normalizeHeader(value: unknown): string {
   return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function parseTrafficLightPdfScoreChapter(text: string): string | null {
+  const match = text.match(/MEMBER TRAFFIC LIGHTS OF\s+(.+?)\s+CHAPTER\s+FOR/i);
+  return match ? match[1].replace(/\s+/g, " ").trim() : null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseTrafficLightPdfScoreRow(line: string, chapterName: string | null): ParsedTrafficLightScoreRow | null {
+  if (!/^\S.*\s\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+\s*$/.test(line)) {
+    return null;
+  }
+
+  let row = line.trim();
+
+  if (chapterName) {
+    const chapterPattern = new RegExp(`^${escapeRegExp(chapterName)}\\s+`, "i");
+    row = row.replace(chapterPattern, "");
+  } else {
+    row = row.replace(/^\S+\s+/, "");
+  }
+
+  const tokens = row.split(/\s+/);
+  const scoreIndex = tokens.findIndex((token) => /^\d+$/.test(token));
+
+  if (scoreIndex <= 0) {
+    return null;
+  }
+
+  const scoreTokens = tokens.slice(scoreIndex);
+
+  if (scoreTokens.length < 8 || !scoreTokens.every((token) => /^\d+$/.test(token))) {
+    return null;
+  }
+
+  const score = parseNumberToken(scoreTokens[0]);
+
+  return {
+    name: tokens.slice(0, scoreIndex).join(" "),
+    score,
+    color: getTrafficLightColor(score),
+  };
+}
+
+export function parseTrafficLightPdfScoreReport(
+  text: string,
+  reportMonthOverride?: string | null,
+): ParsedTrafficLightScoreReport {
+  if (!text.includes("MEMBER TRAFFIC LIGHTS") || !text.includes("Chapter Name Total Score")) {
+    throw new Error("Only BNI Member Traffic Lights score PDF reports are supported.");
+  }
+
+  const chapterName = parseTrafficLightPdfScoreChapter(text);
+  const reportMonth = reportMonthOverride || parseTrafficLightScoreTitleMonth(text);
+  const rows = text
+    .split(/\r?\n/)
+    .map((line) => parseTrafficLightPdfScoreRow(line, chapterName))
+    .filter((row): row is ParsedTrafficLightScoreRow => Boolean(row));
+
+  if (rows.length === 0) {
+    throw new Error("No traffic-light rows were found in the score PDF report.");
+  }
+
+  return {
+    reportMonth,
+    reportWindowStart: reportMonth,
+    reportWindowEnd: reportMonth,
+    rows,
+  };
 }
 
 export function parseTrafficLightXlsxReport(

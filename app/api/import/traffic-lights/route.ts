@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { PDFParse } from "pdf-parse";
 import {
   formatImportError,
+  importTrafficLightPdfScoreReport,
   importTrafficLightReport,
   importTrafficLightXlsxReport,
 } from "@/lib/renewals/traffic-light-import";
@@ -43,9 +44,19 @@ export async function POST(request: Request) {
     }
 
     const normalizedReportMonth = typeof reportMonth === "string" && reportMonth ? reportMonth : null;
-    const result = filename.endsWith(".xlsx")
-      ? await importTrafficLightXlsxReport(Buffer.from(await file.arrayBuffer()), file.name, normalizedReportMonth)
-      : await importTrafficLightReport(await extractPdfText(file), file.name, normalizedReportMonth);
+    if (filename.endsWith(".xlsx")) {
+      const result = await importTrafficLightXlsxReport(
+        Buffer.from(await file.arrayBuffer()),
+        file.name,
+        normalizedReportMonth,
+      );
+      return Response.json(result);
+    }
+
+    const text = await extractPdfText(file);
+    const result = text.includes("Chapter Name Total Score")
+      ? await importTrafficLightPdfScoreReport(text, file.name, normalizedReportMonth)
+      : await importTrafficLightReport(text, file.name, normalizedReportMonth);
 
     return Response.json(result);
   } catch (error) {
