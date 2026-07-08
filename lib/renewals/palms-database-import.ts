@@ -1,8 +1,8 @@
 import { getServiceSupabase } from "../supabase/server";
 import type { Member, MemberPalmsSnapshot } from "../types";
+import { loadMemberAliases, matchRowsByMemberName } from "./member-aliases";
 import {
   buildPalmsReportIdentity,
-  matchPalmsRowMembers,
   parsePalmsChapterSummaryReport,
   type ParsedPalmsReport,
 } from "./palms-import";
@@ -184,7 +184,8 @@ async function importParsedPalmsChapterSummaryReport(
       throw membersError;
     }
 
-    const matchedRows = matchPalmsRowMembers(parsed.rows, (existingMembers ?? []) as Member[]);
+    const memberAliases = await loadMemberAliases();
+    const matchedRows = matchRowsByMemberName(parsed.rows, (existingMembers ?? []) as Member[], memberAliases);
     const records: Omit<MemberPalmsSnapshot, "id">[] = [];
 
     for (const match of matchedRows) {

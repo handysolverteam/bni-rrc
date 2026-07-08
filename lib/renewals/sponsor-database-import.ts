@@ -1,5 +1,6 @@
 import { getServiceSupabase } from "../supabase/server";
-import type { Member, MemberSponsorAchievement } from "../types";
+import type { Member, MemberAlias, MemberSponsorAchievement } from "../types";
+import { loadMemberAliases, matchRowsByMemberName } from "./member-aliases";
 import {
   normalizeImportKey,
   parseSponsorReport,
@@ -63,20 +64,13 @@ function sponsorNaturalKey(record: {
 function buildSponsorMatches(
   rows: ParsedSponsorRow[],
   members: Member[],
+  aliases: Pick<MemberAlias, "member_id" | "normalized_alias_name">[] = [],
 ): Array<{ row: ParsedSponsorRow; matches: Member[] }> {
-  const membersByName = new Map<string, Member[]>();
-
-  for (const member of members) {
-    const key = normalizeImportKey(member.name);
-    const group = membersByName.get(key) ?? [];
-    group.push(member);
-    membersByName.set(key, group);
-  }
-
-  return rows.map((row) => ({
-    row,
-    matches: membersByName.get(normalizeImportKey(row.sponsorFullName)) ?? [],
-  }));
+  return matchRowsByMemberName(
+    rows.map((row) => ({ ...row, name: row.sponsorFullName })),
+    members,
+    aliases,
+  ).map((match) => ({ row: match.row, matches: match.matches }));
 }
 
 export function reconcileSponsorAchievementRecords({
@@ -120,6 +114,7 @@ export function buildDesiredSponsorRecords(
   parsed: ParsedSponsorReport,
   members: Member[],
   batchId: string,
+  aliases: Pick<MemberAlias, "member_id" | "normalized_alias_name">[] = [],
 ): {
   desiredRecords: SponsorAchievementRecordInput[];
   skippedCount: number;
@@ -129,7 +124,7 @@ export function buildDesiredSponsorRecords(
   let skippedCount = 0;
   const errors: string[] = [];
 
-  for (const match of buildSponsorMatches(parsed.rows, members)) {
+  for (const match of buildSponsorMatches(parsed.rows, members, aliases)) {
     if (match.matches.length === 0) {
       skippedCount += 1;
       errors.push(`${match.row.sponsorFullName}: sponsor not found`);
@@ -190,10 +185,12 @@ export async function importSponsorReport(xml: string, filename: string): Promis
       throw membersError;
     }
 
+    const aliases = await loadMemberAliases();
     const { desiredRecords, skippedCount, errors } = buildDesiredSponsorRecords(
       parsed,
       (existingMembers ?? []) as Member[],
       batch.id,
+      aliases,
     );
 
     const { data: existingSponsorAchievements, error: existingSponsorAchievementsError } =

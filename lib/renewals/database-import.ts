@@ -1,6 +1,7 @@
 import { getServiceSupabase } from "../supabase/server";
 import type { ImportMemberRow, Member, RenewalCycle } from "../types";
 import { normalizeImportKey, parseMembershipDuesReport } from "./import";
+import { buildMemberNameResolver, loadMemberAliases } from "./member-aliases";
 
 export type ImportResult = {
   batchId: string | null;
@@ -106,10 +107,13 @@ export async function importMembershipDuesReport(
     const membersByKey = new Map(
       ((existingMembers ?? []) as Member[]).map((member) => [memberKey(member), member]),
     );
+    const existingMemberRows = (existingMembers ?? []) as Member[];
+    const memberAliases = await loadMemberAliases();
+    const resolveMemberName = buildMemberNameResolver(existingMemberRows, memberAliases);
 
     for (const row of parsed.rows) {
       try {
-        const member = await upsertMember(row, membersByKey);
+        const member = await upsertMember(row, membersByKey, resolveMemberName);
         await upsertRenewalCycle(member.id, row, referenceYear);
         importedCount += 1;
       } catch (error) {
@@ -152,10 +156,16 @@ export async function importMembershipDuesReport(
 async function upsertMember(
   row: ImportMemberRow,
   membersByKey: Map<string, Member>,
+  resolveMemberName: (name: string) => Member[],
 ): Promise<Member> {
   const supabase = getServiceSupabase();
   const key = `${normalizeImportKey(row.name)}|${normalizeImportKey(row.industry)}`;
-  const existing = membersByKey.get(key);
+  const aliasMatches = membersByKey.has(key) ? [] : resolveMemberName(row.name);
+  const existing = membersByKey.get(key) ?? aliasMatches[0];
+
+  if (!membersByKey.has(key) && aliasMatches.length > 1) {
+    throw new Error("multiple members matched this alias");
+  }
 
   if (existing) {
     const { data, error } = await supabase

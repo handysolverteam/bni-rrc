@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
 import { sortTrafficLightHistoryForDisplay } from "@/lib/renewals/traffic-light-history";
-import type { DashboardCycle, Member } from "@/lib/types";
+import type { DashboardCycle, Member, MemberAlias } from "@/lib/types";
+import MemberAliasesSection from "./MemberAliasesSection";
 import TaskList from "./TaskList";
 import TrafficLightBadge, { formatTrafficLightColor, TrafficLightTrend } from "./TrafficLightBadge";
 
@@ -11,6 +12,7 @@ type MemberDetailPayload = {
   member: Member;
   currentCycle: DashboardCycle | null;
   cycles: DashboardCycle[];
+  aliases?: MemberAlias[];
 };
 
 export default function MemberDetail({ detail }: { detail: MemberDetailPayload }) {
@@ -93,6 +95,8 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
           </select>
         </div>
       </section>
+
+      <MemberAliasesSection memberId={detail.member.id} aliases={detail.aliases ?? []} />
 
       <section className="grid gap-4 lg:grid-cols-2">
         {cycle.latest_traffic_light ? (

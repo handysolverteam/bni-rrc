@@ -1,5 +1,6 @@
 import { getServiceSupabase } from "../supabase/server";
-import type { Member, MemberTrainingAchievement } from "../types";
+import type { Member, MemberAlias, MemberTrainingAchievement } from "../types";
+import { loadMemberAliases, matchRowsByMemberName } from "./member-aliases";
 import { normalizeImportKey } from "./sponsor-import";
 import { parseTrainingReport, type ParsedTrainingReport, type ParsedTrainingRow } from "./training-import";
 
@@ -44,26 +45,20 @@ function formatImportError(error: unknown): string {
 function buildTrainingMatches(
   rows: ParsedTrainingRow[],
   members: Member[],
+  aliases: Pick<MemberAlias, "member_id" | "normalized_alias_name">[] = [],
 ): Array<{ row: ParsedTrainingRow; matches: Member[] }> {
-  const membersByName = new Map<string, Member[]>();
-
-  for (const member of members) {
-    const key = normalizeImportKey(member.name);
-    const group = membersByName.get(key) ?? [];
-    group.push(member);
-    membersByName.set(key, group);
-  }
-
-  return rows.map((row) => ({
-    row,
-    matches: membersByName.get(normalizeImportKey(row.memberName)) ?? [],
-  }));
+  return matchRowsByMemberName(
+    rows.map((row) => ({ ...row, name: row.memberName })),
+    members,
+    aliases,
+  ).map((match) => ({ row: match.row, matches: match.matches }));
 }
 
 export function buildDesiredTrainingRecords(
   parsed: ParsedTrainingReport,
   members: Member[],
   batchId: string,
+  aliases: Pick<MemberAlias, "member_id" | "normalized_alias_name">[] = [],
 ): {
   desiredRecords: TrainingAchievementRecordInput[];
   skippedCount: number;
@@ -73,7 +68,7 @@ export function buildDesiredTrainingRecords(
   let skippedCount = 0;
   const errors: string[] = [];
 
-  for (const match of buildTrainingMatches(parsed.rows, members)) {
+  for (const match of buildTrainingMatches(parsed.rows, members, aliases)) {
     if (match.matches.length === 0) {
       skippedCount += 1;
       errors.push(`${match.row.memberName}: member not found`);
@@ -137,10 +132,12 @@ export async function importTrainingReport(xml: string, filename: string): Promi
       throw membersError;
     }
 
+    const aliases = await loadMemberAliases();
     const { desiredRecords, skippedCount, errors } = buildDesiredTrainingRecords(
       parsed,
       (existingMembers ?? []) as Member[],
       batch.id,
+      aliases,
     );
 
     const matchedMemberIds = [...new Set(desiredRecords.map((record) => record.member_id))];

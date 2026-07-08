@@ -30,6 +30,16 @@ export type Member = {
   is_committee: boolean;
 };
 
+export type MemberAlias = {
+  id: string;
+  member_id: string;
+  alias_name: string;
+  normalized_alias_name: string;
+  source: "manual" | "rename" | "import_review";
+  created_at: string;
+  updated_at: string;
+};
+
 export type MemberTrafficLight = {
   id: string;
   member_id: string;

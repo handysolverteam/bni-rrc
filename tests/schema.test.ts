@@ -37,6 +37,17 @@ describe("schema", () => {
     expect(sql).toContain("display_order integer not null default 0");
   });
 
+  it("stores member aliases for import name matching", () => {
+    const sql = readFileSync("supabase/migrations/015_member_aliases.sql", "utf8").toLowerCase();
+
+    expect(sql).toContain("create table public.member_aliases");
+    expect(sql).toContain("member_id uuid not null references public.members(id) on delete cascade");
+    expect(sql).toContain("normalized_alias_name text not null");
+    expect(sql).toContain("unique (member_id, normalized_alias_name)");
+    expect(sql).toContain("kunnal gupta");
+    expect(sql).toContain("kunal gupta");
+  });
+
   it("tracks import source metadata separately on import batches", () => {
     const sql = readFileSync("supabase/migrations/008_import_batches_source_metadata.sql", "utf8").toLowerCase();
 

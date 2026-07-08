@@ -4,6 +4,7 @@ import type {
   ChapterRole,
   DashboardCycle,
   Member,
+  MemberAlias,
   MemberPastRoleEntry,
   MemberPalmsSnapshot,
   MemberSponsorAchievement,
@@ -19,6 +20,7 @@ import { calculateStage, getDerivedRenewalDates, isWithinRenewalWorkWindow } fro
 import { buildTrainingAchievementSummary } from "./training-achievements";
 import { isExactMonthlyPalmsSnapshot } from "./palms-monthly-performance";
 import { isActiveRenewalTaskType } from "./task-types";
+import { getMemberAliases } from "./member-aliases";
 import {
   PAST_YEAR_TRAFFIC_LIGHT_LIMIT,
   groupTrafficLightHistoryByMember,
@@ -58,6 +60,20 @@ function isMissingTrainingAchievementsSchemaError(error: unknown): boolean {
     combined.includes("member_training_achievements") ||
     combined.includes("training achievements")
   );
+}
+
+function isMissingMemberAliasesSchemaError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const maybeError = error as { code?: unknown; message?: unknown; details?: unknown };
+  const code = typeof maybeError.code === "string" ? maybeError.code : "";
+  const message = typeof maybeError.message === "string" ? maybeError.message.toLowerCase() : "";
+  const details = typeof maybeError.details === "string" ? maybeError.details.toLowerCase() : "";
+  const combined = `${message} ${details}`;
+
+  return code === "42P01" || combined.includes("member_aliases") || combined.includes("member aliases");
 }
 
 type RenewalCycleRow = RenewalCycle & {
@@ -478,6 +494,16 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
   const trafficLightHistory = trafficLightHistories.get(memberId) ?? [];
   const latestPalmsSnapshots = await getLatestPalmsSnapshotsByMember([memberId]);
   const palmsSnapshotsByMember = await getPalmsSnapshotsByMember([memberId]);
+  let memberAliases: MemberAlias[] = [];
+
+  try {
+    memberAliases = await getMemberAliases(memberId);
+  } catch (error) {
+    if (!isMissingMemberAliasesSchemaError(error)) {
+      throw error;
+    }
+  }
+
   const [availableRoles, pastRolesByMember, sponsorAchievementsByMember, trainingAchievementsByMember] =
     await Promise.all([
     getAvailableRoles(),
@@ -522,6 +548,7 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     performanceAnchorDate,
     availableRoles,
     pastRoles: pastRolesByMember.get(memberId) ?? [],
+    aliases: memberAliases,
   };
 }
 

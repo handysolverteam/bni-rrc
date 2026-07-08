@@ -111,6 +111,36 @@ describe("buildDesiredTrainingRecords", () => {
     expect(result.desiredRecords[0].member_id).toBe("member-1");
   });
 
+  it("matches member names through aliases", () => {
+    const result = buildDesiredTrainingRecords(
+      {
+        chapterName: "Influencers",
+        reportFrom: "2014-10-01",
+        reportTo: "2026-03-31",
+        runAt: null,
+        rows: [
+          {
+            regionName: "Gurgaon",
+            chapterName: "Influencers",
+            firstName: "Old",
+            lastName: "Name",
+            memberName: "Old Name",
+            eventDate: "2024-06-29",
+            eventType: "Power Team Workshop - India",
+            role: null,
+            joinDate: null,
+            inductionDate: null,
+          },
+        ],
+      },
+      members,
+      "batch-1",
+      [{ member_id: "member-1", normalized_alias_name: "old name" }],
+    );
+
+    expect(result.desiredRecords[0].member_id).toBe("member-1");
+  });
+
   it("preserves overlapping historical rows by returning all desired rows for append-only upsert", () => {
     const result = buildDesiredTrainingRecords(
       {

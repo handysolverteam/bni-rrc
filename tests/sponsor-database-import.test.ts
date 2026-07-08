@@ -102,6 +102,36 @@ describe("buildDesiredSponsorRecords", () => {
     expect(result.desiredRecords).toHaveLength(1);
     expect(result.desiredRecords[0].member_id).toBe("member-1");
   });
+
+  it("matches sponsor names through aliases", () => {
+    const result = buildDesiredSponsorRecords(
+      {
+        chapterName: "Influencers",
+        reportFrom: "2014-04-01",
+        reportTo: "2026-04-22",
+        runAt: null,
+        rows: [
+          {
+            sponsorFirstName: "Old",
+            sponsorLastName: "Name",
+            sponsorFullName: "Old Name",
+            totalMembersSponsored: 1,
+            sponsoredFirstName: "Jasmeet",
+            sponsoredLastName: "Singh",
+            sponsoredFullName: "Jasmeet Singh",
+            sponsoredRegion: "Gurgaon",
+            sponsoredChapter: "Influencers",
+            applicationDate: "2025-03-12",
+          },
+        ],
+      },
+      members,
+      "batch-1",
+      [{ member_id: "member-1", normalized_alias_name: "old name" }],
+    );
+
+    expect(result.desiredRecords[0].member_id).toBe("member-1");
+  });
 });
 
 describe("reconcileSponsorAchievementRecords", () => {

@@ -1,6 +1,6 @@
 import { getServiceSupabase } from "../supabase/server";
 import type { Member } from "../types";
-import { normalizeImportKey } from "./import";
+import { buildMemberNameResolver, loadMemberAliases } from "./member-aliases";
 import {
   parseTrafficLightPdfScoreReport,
   parseTrafficLightReport,
@@ -14,10 +14,6 @@ export type TrafficLightImportResult = {
   skippedCount: number;
   errors: string[];
 };
-
-function memberNameKey(member: Pick<Member, "name">): string {
-  return normalizeImportKey(member.name);
-}
 
 function normalizeReportMonth(value: string | null): string | null {
   if (!value) {
@@ -95,7 +91,7 @@ async function createTrafficLightImportBatch(input: {
   return batch;
 }
 
-async function loadMembersByName(): Promise<Map<string, Member[]>> {
+async function loadMemberNameResolver(): Promise<(name: string) => Member[]> {
   const supabase = getServiceSupabase();
   const { data: existingMembers, error: membersError } = await supabase
     .from("members")
@@ -105,14 +101,8 @@ async function loadMembersByName(): Promise<Map<string, Member[]>> {
     throw membersError;
   }
 
-  const membersByName = new Map<string, Member[]>();
-
-  for (const member of (existingMembers ?? []) as Member[]) {
-    const key = memberNameKey(member);
-    membersByName.set(key, [...(membersByName.get(key) ?? []), member]);
-  }
-
-  return membersByName;
+  const aliases = await loadMemberAliases();
+  return buildMemberNameResolver((existingMembers ?? []) as Member[], aliases);
 }
 
 export async function importTrafficLightReport(
@@ -134,12 +124,12 @@ export async function importTrafficLightReport(
   let skippedCount = 0;
 
   try {
-    const membersByName = await loadMembersByName();
+    const resolveMemberName = await loadMemberNameResolver();
 
     const records = [];
 
     for (const row of parsed.rows) {
-      const matches = membersByName.get(normalizeImportKey(row.name)) ?? [];
+      const matches = resolveMemberName(row.name);
 
       if (matches.length === 0) {
         skippedCount += 1;
@@ -238,14 +228,14 @@ async function importTrafficLightScoreReport(
   let skippedCount = 0;
 
   try {
-    const membersByName = await loadMembersByName();
+    const resolveMemberName = await loadMemberNameResolver();
     const matchedRows: Array<{
       member: Member;
       row: ParsedTrafficLightScoreReport["rows"][number];
     }> = [];
 
     for (const row of parsed.rows) {
-      const matches = membersByName.get(normalizeImportKey(row.name)) ?? [];
+      const matches = resolveMemberName(row.name);
 
       if (matches.length === 0) {
         skippedCount += 1;
