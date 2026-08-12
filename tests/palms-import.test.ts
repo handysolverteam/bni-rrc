@@ -10,6 +10,8 @@ import {
 
 const sampleReport =
   "C:\\Users\\rahul\\Downloads\\Chapter_Summary_PALMS_Report_21-04-2026_10-59_AM.xls";
+const julyMonthlyReport =
+  "C:\\Users\\rahul\\Downloads\\Chapter_Summary_PALMS_Report_04-08-2026_7-06_PM.xls";
 
 describe("parsePalmsChapterSummaryReport", () => {
   const sampleReportTest = existsSync(sampleReport) ? it : it.skip;
@@ -72,6 +74,17 @@ describe("parsePalmsChapterSummaryReport", () => {
 
     expect(buildPalmsReportIdentity(parsed)).toBe("Influencers|2015-10-01|2026-03-31");
   });
+
+  const julyMonthlyReportTest = existsSync(julyMonthlyReport) ? it : it.skip;
+
+  julyMonthlyReportTest("recognizes the August 4 export as the July monthly PALMS report", () => {
+    const parsed = parsePalmsChapterSummaryReport(readFileSync(julyMonthlyReport, "utf8"));
+
+    expect(parsed.chapterName).toBe("Influencers");
+    expect(parsed.reportFrom).toBe("2026-07-01");
+    expect(parsed.reportTo).toBe("2026-07-31");
+    expect(() => validatePalmsReportWindow(parsed, "monthly")).not.toThrow();
+  });
 });
 
 describe("validatePalmsReportWindow", () => {
@@ -104,5 +117,18 @@ describe("validatePalmsReportWindow", () => {
         "lifetime",
       ),
     ).toThrow("This is a monthly PALMS file. Use the monthly PALMS upload instead.");
+  });
+
+  it("accepts PALMS datetime values when checking monthly report windows", () => {
+    expect(() =>
+      validatePalmsReportWindow(
+        {
+          ...baseReport,
+          reportFrom: "2026-07-01T00:00:00",
+          reportTo: "2026-07-31T00:00:00",
+        },
+        "monthly",
+      ),
+    ).not.toThrow();
   });
 });
