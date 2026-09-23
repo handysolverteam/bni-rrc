@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { buildChecklistUpdates } from "@/lib/renewals/checklist";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -49,6 +50,7 @@ export async function PATCH(
         );
 
         if (error) {
+          await invalidateCache([CACHE_TAGS.renewals]);
           return Response.json({ error: error.message }, { status: 500 });
         }
       } else {
@@ -59,11 +61,13 @@ export async function PATCH(
           .eq("slot", assignment.slot);
 
         if (error) {
+          await invalidateCache([CACHE_TAGS.renewals]);
           return Response.json({ error: error.message }, { status: 500 });
         }
       }
     }
   }
 
+  await invalidateCache([CACHE_TAGS.renewals]);
   return Response.json({ ok: true });
 }

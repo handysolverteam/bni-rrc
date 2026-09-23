@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { importLifetimePalmsChapterSummaryReports } from "@/lib/renewals/palms-database-import";
 
 export async function POST(request: Request) {
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
     );
     const result = await importLifetimePalmsChapterSummaryReports(payload);
 
+    await invalidateCache([CACHE_TAGS.members, CACHE_TAGS.imports]);
     return Response.json(result);
   } catch (error) {
     return Response.json(

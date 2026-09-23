@@ -60,6 +60,7 @@ export default function AchievementsDirectory({ members }: AchievementsDirectory
           {filteredMembers.map(({ member, currentCycle, latestPalmsSnapshot }) => (
             <Link
               key={member.id}
+              prefetch
               href={`/members/${member.id}/achievements`}
               className="focus-ring block rounded-md border border-[var(--line)] bg-white p-4 hover:border-[var(--accent)]"
             >

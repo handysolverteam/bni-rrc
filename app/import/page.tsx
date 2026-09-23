@@ -1,7 +1,7 @@
 import ImportForm from "@/components/ImportForm";
-import { getPalmsMonthlyCoverage } from "@/lib/renewals/import-coverage";
+import { getPalmsMonthlyCoverage } from "@/lib/cache";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function ImportPage() {
   const coverage = await getPalmsMonthlyCoverage();

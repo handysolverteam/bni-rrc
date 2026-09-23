@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export async function POST(
@@ -43,5 +44,6 @@ export async function POST(
     return Response.json({ error: error.message }, { status: 500 });
   }
 
+  await invalidateCache([CACHE_TAGS.members]);
   return Response.json({ pastRole: data }, { status: 201 });
 }
