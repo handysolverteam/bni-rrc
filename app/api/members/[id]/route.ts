@@ -1,4 +1,4 @@
-import { getMemberDetail } from "@/lib/renewals/data";
+import { CACHE_TAGS, getMemberDetail, invalidateCache } from "@/lib/cache";
 import { normalizeAliasName, sanitizeAliasName } from "@/lib/renewals/member-aliases";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -72,5 +72,6 @@ export async function PATCH(
     }
   }
 
+  await invalidateCache([CACHE_TAGS.renewals, CACHE_TAGS.members]);
   return Response.json({ member: data });
 }

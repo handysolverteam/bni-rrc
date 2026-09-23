@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getRenewalCycleUpdateForTaskStatus } from "@/lib/renewals/task-status";
 import type { RenewalTask } from "@/lib/types";
@@ -55,5 +56,6 @@ export async function PATCH(
     }
   }
 
+  await invalidateCache([CACHE_TAGS.renewals]);
   return Response.json({ ok: true });
 }

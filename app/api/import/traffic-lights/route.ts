@@ -1,6 +1,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { PDFParse } from "pdf-parse";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import {
   formatImportError,
   importTrafficLightPdfScoreReport,
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
         file.name,
         normalizedReportMonth,
       );
+      await invalidateCache([CACHE_TAGS.renewals, CACHE_TAGS.members]);
       return Response.json(result);
     }
 
@@ -58,6 +60,7 @@ export async function POST(request: Request) {
       ? await importTrafficLightPdfScoreReport(text, file.name, normalizedReportMonth)
       : await importTrafficLightReport(text, file.name, normalizedReportMonth);
 
+    await invalidateCache([CACHE_TAGS.renewals, CACHE_TAGS.members]);
     return Response.json(result);
   } catch (error) {
     return Response.json(

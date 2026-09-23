@@ -16,7 +16,13 @@ import type {
 } from "../types";
 import { selectLifetimePalmsSnapshot } from "./achievements";
 import { buildSponsorAchievementSummary } from "./sponsor-achievements";
-import { calculateStage, getDerivedRenewalDates, isWithinRenewalWorkWindow } from "./stage";
+import {
+  addDays,
+  calculateStage,
+  getDerivedRenewalDates,
+  isWithinRenewalWorkWindow,
+  toDateOnly,
+} from "./stage";
 import { buildTrainingAchievementSummary } from "./training-achievements";
 import { isExactMonthlyPalmsSnapshot } from "./palms-monthly-performance";
 import { isActiveRenewalTaskType } from "./task-types";
@@ -76,6 +82,18 @@ function isMissingMemberAliasesSchemaError(error: unknown): boolean {
   return code === "42P01" || combined.includes("member_aliases") || combined.includes("member aliases");
 }
 
+async function getMemberAliasesSafely(memberId: string): Promise<MemberAlias[]> {
+  try {
+    return await getMemberAliases(memberId);
+  } catch (error) {
+    if (isMissingMemberAliasesSchemaError(error)) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
 type RenewalCycleRow = RenewalCycle & {
   members: Member | null;
   renewal_assignments: Array<
@@ -85,6 +103,22 @@ type RenewalCycleRow = RenewalCycle & {
   >;
   renewal_tasks: RenewalTask[];
 };
+
+// Shared column list for cycle embeds. Milestone/audit timestamps are omitted because
+// the UI never reads them on list/detail pages, shrinking payloads on every route.
+const CYCLE_EMBED_SELECT = `
+  id, member_id, renewal_year, renewal_date, reported_due_date, status,
+  source_membership_status, auto_renewal_enabled, is_two_year_renewal,
+  last_followup_date, next_followup_date, online_form_filled, online_form_filled_date,
+  checklist_filled, checklist_filled_date, payment_link_generated, payment_link_generated_date,
+  payment_made, payment_made_date,
+  members (id, name, industry, sponsor, report_role, member_since, is_committee, auth_user_id),
+  renewal_assignments (
+    id, renewal_cycle_id, assignee_member_id, slot,
+    members:assignee_member_id (id, name, industry)
+  ),
+  renewal_tasks (id, task_type, status, due_date, notes, completed_at)
+`;
 
 export function enrichCycle(
   row: RenewalCycleRow,
@@ -360,26 +394,19 @@ async function getLatestTrainingReportAnchor(importBatchIds: string[]): Promise<
 
 export async function getDashboardCycles(today = new Date()): Promise<DashboardCycle[]> {
   const supabase = getServiceSupabase();
+  const workWindowEnd = toDateOnly(addDays(today, 120));
+
   const { data, error } = await supabase
     .from("renewal_cycles")
-    .select(
-      `
-      *,
-      members (*),
-      renewal_assignments (
-        *,
-        members:assignee_member_id (id, name, industry)
-      ),
-      renewal_tasks (*)
-    `,
-    )
+    .select(CYCLE_EMBED_SELECT)
+    .lte("renewal_date", workWindowEnd)
     .order("renewal_date", { ascending: true });
 
   if (error) {
     throw error;
   }
 
-  const rows = ((data ?? []) as RenewalCycleRow[]).filter(
+  const rows = ((data ?? []) as unknown as RenewalCycleRow[]).filter(
     (row) => row.members && isWithinRenewalWorkWindow(row.renewal_date, today),
   );
   const trafficLightHistories = await getTrafficLightHistoriesByMember(
@@ -407,31 +434,23 @@ export async function getAchievementMembers(
   const memberRows = (members ?? []) as Member[];
   const memberIds = memberRows.map((member) => member.id);
 
-  const { data: cycles, error: cyclesError } = await supabase
-    .from("renewal_cycles")
-    .select(
-      `
-      *,
-      members (*),
-      renewal_assignments (
-        *,
-        members:assignee_member_id (id, name, industry)
-      ),
-      renewal_tasks (*)
-    `,
-    )
-    .in("member_id", memberIds)
-    .order("renewal_date", { ascending: false });
+  const [cyclesResult, trafficLightHistories, latestPalmsSnapshots] = await Promise.all([
+    supabase
+      .from("renewal_cycles")
+      .select(CYCLE_EMBED_SELECT)
+      .in("member_id", memberIds)
+      .order("renewal_date", { ascending: false }),
+    getTrafficLightHistoriesByMember(memberIds),
+    getLatestPalmsSnapshotsByMember(memberIds),
+  ]);
 
-  if (cyclesError) {
-    throw cyclesError;
+  if (cyclesResult.error) {
+    throw cyclesResult.error;
   }
 
-  const trafficLightHistories = await getTrafficLightHistoriesByMember(memberIds);
-  const latestPalmsSnapshots = await getLatestPalmsSnapshotsByMember(memberIds);
   const latestCyclesByMember = new Map<string, DashboardCycle>();
 
-  for (const row of (cycles ?? []) as RenewalCycleRow[]) {
+  for (const row of (cyclesResult.data ?? []) as unknown as RenewalCycleRow[]) {
     if (latestCyclesByMember.has(row.member_id)) {
       continue;
     }
@@ -467,63 +486,37 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     throw memberError;
   }
 
-  const { data: cycles, error: cyclesError } = await supabase
-    .from("renewal_cycles")
-    .select(
-      `
-      *,
-      members (*),
-      renewal_assignments (
-        *,
-        members:assignee_member_id (id, name, industry)
-      ),
-      renewal_tasks (*)
-    `,
-    )
-    .eq("member_id", memberId)
-    .order("renewal_date", { ascending: false });
-
-  if (cyclesError) {
-    throw cyclesError;
-  }
-
-  const trafficLightHistories = await getTrafficLightHistoriesByMember(
-    [memberId],
-    PAST_YEAR_TRAFFIC_LIGHT_LIMIT,
-  );
-  const trafficLightHistory = trafficLightHistories.get(memberId) ?? [];
-  const latestPalmsSnapshots = await getLatestPalmsSnapshotsByMember([memberId]);
-  const palmsSnapshotsByMember = await getPalmsSnapshotsByMember([memberId]);
-  let memberAliases: MemberAlias[] = [];
-
-  try {
-    memberAliases = await getMemberAliases(memberId);
-  } catch (error) {
-    if (!isMissingMemberAliasesSchemaError(error)) {
-      throw error;
-    }
-  }
-
-  const [availableRoles, pastRolesByMember, sponsorAchievementsByMember, trainingAchievementsByMember] =
+  const [cyclesResult, trafficLightHistories, palmsByMember, memberAliases, availableRoles, pastRolesByMember, sponsorAchievementsByMember, trainingAchievementsByMember] =
     await Promise.all([
-    getAvailableRoles(),
-    getPastRolesByMember([memberId]),
-    getSponsorAchievementsByMember([memberId]),
-    getTrainingAchievementsByMember([memberId]),
-  ]);
-  const enrichedCycles = ((cycles ?? []) as RenewalCycleRow[]).map((row) =>
+      supabase
+        .from("renewal_cycles")
+        .select(CYCLE_EMBED_SELECT)
+        .eq("member_id", memberId)
+        .order("renewal_date", { ascending: false }),
+      getTrafficLightHistoriesByMember([memberId], PAST_YEAR_TRAFFIC_LIGHT_LIMIT),
+      getPalmsSnapshotsByMember([memberId]),
+      getMemberAliasesSafely(memberId),
+      getAvailableRoles(),
+      getPastRolesByMember([memberId]),
+      getSponsorAchievementsByMember([memberId]),
+      getTrainingAchievementsByMember([memberId]),
+    ]);
+
+  if (cyclesResult.error) {
+    throw cyclesResult.error;
+  }
+
+  const trafficLightHistory = trafficLightHistories.get(memberId) ?? [];
+  const memberPalmsSnapshots = palmsByMember.get(memberId) ?? [];
+  const latestPalmsSnapshot = selectLifetimePalmsSnapshot(memberPalmsSnapshots) ?? null;
+  const sponsorAchievements = sponsorAchievementsByMember.get(memberId) ?? [];
+  const sponsorSummary = buildSponsorAchievementSummary(sponsorAchievements, today);
+  const trainingAchievements = trainingAchievementsByMember.get(memberId) ?? [];
+  const trainingSummary = buildTrainingAchievementSummary(trainingAchievements, today);
+  const enrichedCycles = ((cyclesResult.data ?? []) as unknown as RenewalCycleRow[]).map((row) =>
     enrichCycle({ ...row, members: member as Member }, today, trafficLightHistory),
   );
-  const sponsorSummary = buildSponsorAchievementSummary(
-    sponsorAchievementsByMember.get(memberId) ?? [],
-    today,
-  );
-  const trainingSummary = buildTrainingAchievementSummary(
-    trainingAchievementsByMember.get(memberId) ?? [],
-    today,
-  );
-  const trainingAchievements = trainingAchievementsByMember.get(memberId) ?? [];
-  const latestExactMonthlyPalmsReportTo = (palmsSnapshotsByMember.get(memberId) ?? [])
+  const latestExactMonthlyPalmsReportTo = memberPalmsSnapshots
     .filter(isExactMonthlyPalmsSnapshot)
     .map((snapshot) => snapshot.report_to)
     .sort((left, right) => right.localeCompare(left))[0];
@@ -539,9 +532,9 @@ export async function getMemberDetail(memberId: string, today = new Date()) {
     member: member as Member,
     currentCycle: enrichedCycles[0] ?? null,
     cycles: enrichedCycles,
-    latestPalmsSnapshot: latestPalmsSnapshots.get(memberId) ?? null,
-    palmsSnapshots: palmsSnapshotsByMember.get(memberId) ?? [],
-    sponsorAchievements: sponsorAchievementsByMember.get(memberId) ?? [],
+    latestPalmsSnapshot,
+    palmsSnapshots: memberPalmsSnapshots,
+    sponsorAchievements,
     sponsorSummary,
     trainingAchievements,
     trainingSummary,
