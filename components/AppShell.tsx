@@ -35,6 +35,12 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
+  const isNavActive = (href: string) =>
+    href === "/"
+      ? pathname === "/"
+      : href === "/tasks"
+        ? pathname === "/tasks"
+        : pathname === href || pathname.startsWith(`${href}/`);
 
   /**
    * Cross-app SSO with any trusted sibling app (see lib/sso-partners.ts). The contract is
@@ -187,19 +193,34 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
             BNI Renewal CRM
           </Link>
           <nav className="hidden gap-2 text-sm md:flex">
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/"
+            >
               Dashboard
             </Link>
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/achievements">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/achievements") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/achievements"
+            >
               Achievements
             </Link>
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/tasks/inbox">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/tasks/inbox") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/tasks/inbox"
+            >
               Task Inbox
             </Link>
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/tasks">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/tasks") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/tasks"
+            >
               Task Buckets
             </Link>
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/import">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/import") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/import"
+            >
               Import
             </Link>
             <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/chat">

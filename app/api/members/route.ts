@@ -1,4 +1,4 @@
-import { getDashboardCycles } from "@/lib/renewals/data";
+import { getDashboardCycles } from "@/lib/cache";
 
 export async function GET() {
   try {

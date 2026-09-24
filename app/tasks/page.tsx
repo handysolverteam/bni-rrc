@@ -1,8 +1,8 @@
 import DashboardTaskBuckets from "@/components/DashboardTaskBuckets";
-import { getDashboardCycles } from "@/lib/renewals/data";
+import { getDashboardCycles } from "@/lib/cache";
 import type { DashboardCycle } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function TasksPage() {
   let cycles: DashboardCycle[] = [];

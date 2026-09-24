@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { importMembershipDuesReport } from "@/lib/renewals/database-import";
 
 export async function POST(request: Request) {
@@ -16,6 +17,7 @@ export async function POST(request: Request) {
     const xml = await file.text();
     const result = await importMembershipDuesReport(xml, file.name);
 
+    await invalidateCache([CACHE_TAGS.renewals, CACHE_TAGS.members]);
     return Response.json(result);
   } catch (error) {
     return Response.json(

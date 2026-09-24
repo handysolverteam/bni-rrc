@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
 export async function DELETE(
@@ -16,5 +17,6 @@ export async function DELETE(
     return Response.json({ error: error.message }, { status: 500 });
   }
 
+  await invalidateCache([CACHE_TAGS.members]);
   return Response.json({ ok: true });
 }

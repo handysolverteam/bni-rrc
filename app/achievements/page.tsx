@@ -1,8 +1,8 @@
 import AchievementsDirectory from "@/components/AchievementsDirectory";
-import { getAchievementMembers } from "@/lib/renewals/data";
+import { getAchievementMembers } from "@/lib/cache";
 import type { AchievementMemberListItem } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function AchievementsPage() {
   let members: AchievementMemberListItem[] = [];

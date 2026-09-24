@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { importSponsorReport } from "@/lib/renewals/sponsor-database-import";
 
 export async function POST(request: Request) {
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
     }
 
     const result = await importSponsorReport(await file.text(), file.name);
+    await invalidateCache([CACHE_TAGS.members]);
     return Response.json(result);
   } catch (error) {
     return Response.json(
