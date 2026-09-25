@@ -28,6 +28,37 @@ function mainMenuReply(text: string): ActionReply {
   return { text, options: getMainMenuOptions() };
 }
 
+export const chatStageNames = [
+  "Critical Deadline",
+  "Payment Pending",
+  "Documents Pending",
+  "Member Discussion",
+  "MC Discussion",
+  "Renewed",
+  "Dropped",
+];
+
+/**
+ * Single-stage member list, shared by the QUERY_STAGE quick action and the
+ * free-text local engine so both answer a specific stage identically.
+ */
+export function stageMembersText(snapshot: ChatSnapshot, stage: string): string {
+  const stageMembers = snapshot.members.filter((m) => m.renewalStage === stage);
+
+  if (stageMembers.length === 0) {
+    return `📄 *${stage}*\n\nNo members are currently in the ${stage} stage.`;
+  }
+
+  let text = `📄 *${stage} (${stageMembers.length} Members)*\n\n`;
+  stageMembers.forEach((m, idx) => {
+    const datePart = m.renewalDate ? `— renewal ${m.renewalDate}` : "";
+    text += `${idx + 1}. *${m.name}* ${datePart}\n`;
+    if (m.openTaskCount > 0) text += `   • ${m.openTaskCount} open task(s) remaining\n`;
+  });
+
+  return text;
+}
+
 function zoneMenuReply(): ActionReply {
   return {
     text: "🚦 *Traffic Light Zone Breakdown*\n\nSelect a zone to audit:",
@@ -150,18 +181,11 @@ export function resolveOptionAction(
 
     case "QUERY_STAGE": {
       const stage = String(option.payload?.stage ?? "");
-      const stageMembers = members.filter((m) => m.renewalStage === stage);
+      const text = stageMembersText(snapshot, stage);
 
-      if (stageMembers.length === 0) {
-        return mainMenuReply(`📄 *${stage}*\n\nNo members are currently in the ${stage} stage.`);
+      if (text.startsWith(`📄 *${stage}*\n\nNo members`)) {
+        return mainMenuReply(text);
       }
-
-      let text = `📄 *${stage} (${stageMembers.length} Members)*\n\n`;
-      stageMembers.forEach((m, idx) => {
-        const datePart = m.renewalDate ? `— renewal ${m.renewalDate}` : "";
-        text += `${idx + 1}. *${m.name}* ${datePart}\n`;
-        if (m.openTaskCount > 0) text += `   • ${m.openTaskCount} open task(s) remaining\n`;
-      });
 
       return {
         text,

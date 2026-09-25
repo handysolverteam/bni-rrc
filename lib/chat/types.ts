@@ -14,6 +14,12 @@ export interface ChatMessage {
   createdAt?: string;
 }
 
+export interface TrafficHistoryPoint {
+  month: string | null;
+  score: number | null;
+  color: string;
+}
+
 export interface ChatSnapshotMember {
   name: string;
   industry: string | null;
@@ -24,13 +30,22 @@ export interface ChatSnapshotMember {
   latestScore: number | null;
   latestColor: string | null;
   latestReportMonth: string | null;
+  /** Oldest-to-newest, at most the last 6 scored reports. */
+  trafficHistory: TrafficHistoryPoint[];
+  /** Latest exact-monthly PALMS window (for "last month" questions); null when absent. */
+  monthlyReferrals: number | null;
+  monthlyReferralsReceived: number | null;
+  monthlyReportMonth: string | null;
   palmsReferrals: number | null;
+  palmsReferralsReceived: number | null;
   palmsOneToOne: number | null;
   palmsTyfcb: number | null;
   palmsCeu: number | null;
+  palmsVisitors: number | null;
   renewalStatus: string | null;
   renewalDate: string | null;
   renewalStage: string | null;
+  isTwoYear: boolean;
   openTaskCount: number;
   lifetimeSponsors: number;
   pastYearSponsors: number;

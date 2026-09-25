@@ -28,28 +28,34 @@ function StageColumn({
           className="focus-ring mb-3 flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-1 py-1 text-left"
         >
           <span className="flex items-center gap-2">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              className={`shrink-0 transition-transform ${collapsed ? "-rotate-90" : ""}`}
-            >
-              <path d="m6 9 6 6 6-6" />
-            </svg>
             <span className="font-semibold">{group.stage}</span>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#eef1ea] text-xs font-semibold text-[var(--foreground)]">
+              {group.cycles.length}
+            </span>
           </span>
-          <span className="rounded-md bg-white px-2 py-1 text-xs">{group.cycles.length}</span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            className={`shrink-0 transition-transform ${collapsed ? "rotate-180" : ""}`}
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
         </button>
       ) : (
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-semibold">{group.stage}</h3>
-          <span className="rounded-md bg-white px-2 py-1 text-xs">{group.cycles.length}</span>
+        <div className="mb-3 flex items-center justify-between px-1 py-1">
+          <h3 className="flex items-center gap-2 font-semibold">
+            {group.stage}
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#eef1ea] text-xs font-semibold text-[var(--foreground)]">
+              {group.cycles.length}
+            </span>
+          </h3>
         </div>
       )}
       <div className="space-y-3">

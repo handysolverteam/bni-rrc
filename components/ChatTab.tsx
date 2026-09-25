@@ -7,14 +7,6 @@ import { getCurrentIdToken } from "@/lib/chat/token";
 import { getWhatsAppUrl } from "@/lib/chat/format";
 import type { ChatMessage, ChatOption } from "@/lib/chat/types";
 
-const MAIN_MENU_OPTIONS: ChatOption[] = [
-  { id: "opt_pipeline", label: "🔄 Renewal Pipeline Overview", action: "QUERY_PIPELINE" },
-  { id: "opt_zones", label: "🚦 Traffic Light Zones", action: "ZONE_MENU" },
-  { id: "opt_exec", label: "📋 Chapter Executive Overview", action: "QUERY_EXEC" },
-  { id: "opt_tyfcb", label: "💰 TYFCB Business Leaders", action: "QUERY_TYFCB" },
-  { id: "opt_committee", label: "🏅 Committee & Past Roles", action: "QUERY_COMMITTEE" },
-];
-
 function renderFormattedText(text: string): React.ReactNode {
   const lines = text.split("\n");
   return lines.map((line, lineIdx) => {
@@ -84,7 +76,7 @@ export default function ChatTab() {
 
   const welcomeMessage = useMemo(() => {
     const firstName = userDisplayName.split(" ")[0];
-    return `👋 *Welcome to the BNI Renewal CRM Assistant, ${firstName}!*\n\nI analyze the renewal pipeline (Critical Deadline, Payment Pending, Documents Pending), member traffic-light zones, TYFCB business, committee & past roles. Ask me anything or select an option below:`;
+    return `👋 *Welcome to the BNI Renewal CRM Assistant, ${firstName}!*\n\nI analyze the renewal pipeline (Critical Deadline, Payment Pending, Documents Pending), member traffic-light zones, TYFCB business, committee & past roles. Ask me anything below:`;
   }, [userDisplayName]);
 
   useEffect(() => {
@@ -95,7 +87,6 @@ export default function ChatTab() {
           id: `welcome_${Date.now()}`,
           sender: "ai",
           text: welcomeMessage,
-          options: MAIN_MENU_OPTIONS,
           timestamp: fmtTime(),
         },
       ]);
@@ -125,7 +116,6 @@ export default function ChatTab() {
               id: `welcome_${Date.now()}`,
               sender: "ai",
               text: welcomeText,
-              options: MAIN_MENU_OPTIONS,
               timestamp: fmtTime(),
             },
           ]);
@@ -156,12 +146,17 @@ export default function ChatTab() {
 
   const saveMessage = async (sender: "user" | "ai", text: string, options: ChatOption[] = []) => {
     try {
-      await authFetch("/api/chat/history", {
+      const response = await authFetch("/api/chat/history", {
         method: "POST",
         body: JSON.stringify({ sender, text, options, sessionId }),
       });
-    } catch {
+      if (!response.ok) {
+        // Best-effort, but never silent: a failing save means history won't survive refresh.
+        console.warn(`Chat history save failed (${response.status}). Migration 016 may not be applied.`);
+      }
+    } catch (error) {
       // Persistence is best-effort; never block the UI on it.
+      console.warn("Chat history save failed:", error instanceof Error ? error.message : error);
     }
   };
 
@@ -174,7 +169,6 @@ export default function ChatTab() {
         id: `welcome_${Date.now()}`,
         sender: "ai",
         text: `✨ *New Conversation Started*\n\n${welcomeMessage}`,
-        options: MAIN_MENU_OPTIONS,
         timestamp: fmtTime(),
       },
     ]);
@@ -231,7 +225,6 @@ export default function ChatTab() {
           id: `welcome_${Date.now()}`,
           sender: "ai",
           text: welcomeText,
-          options: MAIN_MENU_OPTIONS,
           timestamp: fmtTime(),
         },
       ]);
@@ -308,53 +301,10 @@ export default function ChatTab() {
         id: `ai_err_${Date.now()}`,
         sender: "ai",
         text: `⚠️ *I ran into a problem answering that.*\n\n${error instanceof Error ? error.message : "Please try again."}`,
-        options: MAIN_MENU_OPTIONS,
         timestamp: fmtTime(),
       };
       setMessages((prev) => [...prev, errMsg]);
       await saveMessage("ai", errMsg.text, errMsg.options);
-    } finally {
-      setIsTyping(false);
-    }
-  };
-
-  const handleOptionSelect = async (option: ChatOption) => {
-    if (isTyping) return;
-
-    const userMsg: ChatMessage = {
-      id: `usr_${Date.now()}`,
-      sender: "user",
-      text: option.label,
-      timestamp: fmtTime(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setIsTyping(true);
-    await saveMessage("user", option.label);
-
-    try {
-      const result = await requestGeneration({
-        action: option.action,
-        payload: option.payload,
-        message: option.label,
-      });
-      const aiMsg: ChatMessage = {
-        id: `ai_${Date.now()}`,
-        sender: "ai",
-        text: result.text,
-        options: result.options && result.options.length > 0 ? result.options : [],
-        timestamp: fmtTime(),
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-      await saveMessage("ai", result.text, result.options ?? []);
-    } catch (error) {
-      const errMsg: ChatMessage = {
-        id: `ai_err_${Date.now()}`,
-        sender: "ai",
-        text: `⚠️ *Something went wrong.* ${error instanceof Error ? error.message : "Please try again."}`,
-        options: MAIN_MENU_OPTIONS,
-        timestamp: fmtTime(),
-      };
-      setMessages((prev) => [...prev, errMsg]);
     } finally {
       setIsTyping(false);
     }
@@ -495,22 +445,6 @@ export default function ChatTab() {
                   <div className="text-right font-mono text-[10px] text-[var(--muted)]">
                     {msg.timestamp}
                   </div>
-
-                  {msg.sender === "ai" && msg.options && msg.options.length > 0 && (
-                    <div className="space-y-1.5 border-t border-[var(--line)] pt-2.5">
-                      {msg.options.map((opt) => (
-                        <button
-                          key={opt.id}
-                          onClick={() => void handleOptionSelect(opt)}
-                          disabled={isTyping}
-                          className="focus-ring flex min-h-10 w-full items-center justify-between rounded-lg border border-[var(--line)] bg-[#fbfbf8] px-3.5 py-2 text-left text-xs font-medium transition-colors hover:bg-[#eef1ea] disabled:opacity-50"
-                        >
-                          <span>{opt.label}</span>
-                          <ArrowIcon />
-                        </button>
-                      ))}
-                    </div>
-                  )}
 
                   {msg.sender === "ai" && !isMenuMessage && (
                     <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--line)] pt-2.5">

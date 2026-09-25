@@ -13,7 +13,13 @@ import { buildSponsorAchievementSummary } from "../renewals/sponsor-achievements
 import { buildTrainingAchievementSummary } from "../renewals/training-achievements";
 import { calculateStage, isWithinRenewalWorkWindow } from "../renewals/stage";
 import { isActiveRenewalTaskType } from "../renewals/task-types";
-import type { ChatSnapshot, ChatSnapshotMember, ChatSummary } from "./types";
+import { isExactMonthlyPalmsSnapshot } from "../renewals/palms-monthly-performance";
+import type {
+  ChatSnapshot,
+  ChatSnapshotMember,
+  ChatSummary,
+  TrafficHistoryPoint,
+} from "./types";
 
 function isMissingChatSchemaError(error: unknown, table: string): boolean {
   if (!error || typeof error !== "object") return false;
@@ -96,17 +102,22 @@ export async function getChatSnapshot(today = new Date()): Promise<ChatSnapshot>
   }
 
   const latestTrafficLightByMember = new Map<string, MemberTrafficLight>();
+  // Rows arrive newest-first; keep the newest 6 per member for trend analysis.
+  const historyByMember = new Map<string, MemberTrafficLight[]>();
   for (const row of (trafficLights ?? []) as MemberTrafficLight[]) {
     if (!latestTrafficLightByMember.has(row.member_id)) {
       latestTrafficLightByMember.set(row.member_id, row);
     }
+    const group = historyByMember.get(row.member_id) ?? [];
+    if (group.length < 6) group.push(row);
+    historyByMember.set(row.member_id, group);
   }
 
   // Latest palms snapshot per member (lifetime snapshot preferred).
   const { data: palmsSnapshots, error: palmsError } = await supabase
     .from("member_palms_snapshots")
     .select(
-      "member_id, report_to, referrals_given_inside, referrals_given_outside, one_to_ones, tyfcb, ceu",
+      "member_id, report_from, report_to, referrals_given_inside, referrals_given_outside, referrals_received_inside, referrals_received_outside, visitors, one_to_ones, tyfcb, ceu",
     )
     .in("member_id", memberIds)
     .order("report_to", { ascending: false });
@@ -179,7 +190,7 @@ export async function getChatSnapshot(today = new Date()): Promise<ChatSnapshot>
   try {
     const { data: trainingRows, error: trainingError } = await supabase
       .from("member_training_achievements")
-      .select("member_id, event_date")
+      .select("member_id, event_date, event_type")
       .in("member_id", memberIds);
 
     if (trainingError) {
@@ -230,7 +241,18 @@ export async function getChatSnapshot(today = new Date()): Promise<ChatSnapshot>
 
   const snapshotMembers: ChatSnapshotMember[] = memberRows.map((member) => {
     const latestTrafficLight = latestTrafficLightByMember.get(member.id);
-    const latestPalms = selectLifetimePalmsSnapshot(palmsByMember.get(member.id) ?? []);
+    const memberPalms = palmsByMember.get(member.id) ?? [];
+    const latestPalms = selectLifetimePalmsSnapshot(memberPalms);
+    // Latest exact-monthly window answers "last month" questions; lifetime covers the rest.
+    const latestMonthlyPalms = memberPalms.find((row) => isExactMonthlyPalmsSnapshot(row));
+    const trafficHistory: TrafficHistoryPoint[] = (historyByMember.get(member.id) ?? [])
+      .slice()
+      .reverse()
+      .map((row) => ({
+        month: row.report_month ?? null,
+        score: row.score ?? null,
+        color: trafficColorFromRaw(row.color),
+      }));
     const latestCycle = latestCycleByMember.get(member.id);
     const openTaskCount = latestCycle
       ? latestCycle.tasks.filter((task) => task.status === "open" && isActiveRenewalTaskType(task.task_type))
@@ -259,17 +281,36 @@ export async function getChatSnapshot(today = new Date()): Promise<ChatSnapshot>
       latestScore: latestTrafficLight?.score ?? null,
       latestColor: latestTrafficLight ? trafficColorFromRaw(latestTrafficLight.color) : null,
       latestReportMonth: latestTrafficLight?.report_month ?? null,
+      trafficHistory,
+      monthlyReferrals:
+        latestMonthlyPalms != null
+          ? Number(latestMonthlyPalms.referrals_given_inside ?? 0) +
+            Number(latestMonthlyPalms.referrals_given_outside ?? 0)
+          : null,
+      monthlyReferralsReceived:
+        latestMonthlyPalms != null
+          ? Number(latestMonthlyPalms.referrals_received_inside ?? 0) +
+            Number(latestMonthlyPalms.referrals_received_outside ?? 0)
+          : null,
+      monthlyReportMonth: latestMonthlyPalms?.report_to ?? null,
       palmsReferrals:
         latestPalms != null
           ? Number(latestPalms.referrals_given_inside ?? 0) +
             Number(latestPalms.referrals_given_outside ?? 0)
           : null,
+      palmsReferralsReceived:
+        latestPalms != null
+          ? Number(latestPalms.referrals_received_inside ?? 0) +
+            Number(latestPalms.referrals_received_outside ?? 0)
+          : null,
       palmsOneToOne: latestPalms?.one_to_ones ?? null,
       palmsTyfcb: latestPalms?.tyfcb ?? null,
       palmsCeu: latestPalms?.ceu ?? null,
+      palmsVisitors: latestPalms?.visitors ?? null,
       renewalStatus: latestCycle?.cycle.status ?? null,
       renewalDate: latestCycle?.cycle.renewal_date ?? null,
       renewalStage: stage ?? null,
+      isTwoYear: latestCycle?.cycle.is_two_year_renewal ?? false,
       openTaskCount,
       lifetimeSponsors: sponsorSummary.lifetimeCount,
       pastYearSponsors: sponsorSummary.pastYearCount,
@@ -348,13 +389,25 @@ export function snapshotToPromptDataset(snapshot: ChatSnapshot): Record<string, 
       score: member.latestScore ?? "N/A",
       zone: member.latestColor ?? "grey",
       reportMonth: member.latestReportMonth ?? "N/A",
+      trend: member.trafficHistory.map((p) => ({
+        m: p.month ?? "N/A",
+        s: p.score ?? "N/A",
+        c: p.color,
+      })),
+      lastMonthReferrals: member.monthlyReferrals ?? "N/A",
+      lastMonthReceived: member.monthlyReferralsReceived ?? "N/A",
+      lastMonthReport: member.monthlyReportMonth ?? "N/A",
       palmsReferrals: member.palmsReferrals ?? "N/A",
+      palmsReferralsReceived: member.palmsReferralsReceived ?? "N/A",
       palms1to1: member.palmsOneToOne ?? "N/A",
       palmsCEU: member.palmsCeu ?? "N/A",
       palmsTYFCB: member.palmsTyfcb ?? "N/A",
+      palmsVisitors: member.palmsVisitors ?? "N/A",
       renewalStatus: member.renewalStatus ?? "N/A",
       renewalDate: member.renewalDate ?? "N/A",
       renewalStage: member.renewalStage ?? "N/A",
+      isTwoYear: member.isTwoYear,
+      memberSince: member.memberSince ?? "N/A",
       openTasks: member.openTaskCount,
       sponsorsLifetime: member.lifetimeSponsors,
       sponsorsPastYear: member.pastYearSponsors,

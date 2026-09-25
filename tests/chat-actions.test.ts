@@ -13,13 +13,20 @@ function member(overrides: Partial<ChatSnapshotMember>): ChatSnapshotMember {
     latestScore: 6.5,
     latestColor: "green",
     latestReportMonth: "Apr",
+    trafficHistory: [],
+    monthlyReferrals: null,
+    monthlyReferralsReceived: null,
+    monthlyReportMonth: null,
     palmsReferrals: 12,
+    palmsReferralsReceived: 6,
     palmsOneToOne: 8,
     palmsTyfcb: 5000,
     palmsCeu: 4,
+    palmsVisitors: 2,
     renewalStatus: "active",
     renewalDate: "2026-07-01",
     renewalStage: "normal",
+    isTwoYear: false,
     openTaskCount: 0,
     lifetimeSponsors: 1,
     pastYearSponsors: 0,
@@ -110,5 +117,32 @@ describe("chat quick-option actions", () => {
     );
     expect(reply.text).toContain("Alice Advisory");
     expect(reply.text).not.toContain("Bob Realty");
+  });
+
+  it("lists only the requested stage for QUERY_STAGE", () => {
+    const reply = resolveOptionAction(
+      {
+        id: "opt_stage",
+        label: "Critical Deadline",
+        action: "QUERY_STAGE",
+        payload: { stage: "Critical Deadline" },
+      },
+      snapshot,
+    );
+    expect(reply.text).toContain("Bob Realty");
+    expect(reply.text).not.toContain("Alice Advisory");
+  });
+
+  it("reports an empty stage for QUERY_STAGE", () => {
+    const reply = resolveOptionAction(
+      {
+        id: "opt_stage",
+        label: "Payment Pending",
+        action: "QUERY_STAGE",
+        payload: { stage: "Payment Pending" },
+      },
+      snapshot,
+    );
+    expect(reply.text).toContain("No members are currently in the Payment Pending stage.");
   });
 });

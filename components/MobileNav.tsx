@@ -36,7 +36,7 @@ export default function MobileNav() {
           Import
         </Link>
         <Link
-          className="focus-ring flex min-h-11 items-center justify-center rounded-md bg-[#eef1ea] text-sm font-medium"
+          className={`focus-ring flex min-h-11 items-center justify-center rounded-md text-sm font-medium ${isActive("/chat") ? "bg-[var(--accent)] text-white" : "bg-[#eef1ea]"}`}
           href="/chat"
         >
           Chat
