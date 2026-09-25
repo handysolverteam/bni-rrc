@@ -223,6 +223,12 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
             >
               Import
             </Link>
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/chat") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/chat"
+            >
+              Chat
+            </Link>
           </nav>
           <UserMenu />
         </div>
