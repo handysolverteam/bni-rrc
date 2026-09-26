@@ -119,10 +119,11 @@ export default function LoginPage() {
 
         <div className="rounded-md border border-[var(--line)] bg-[#eef1ea] px-3 py-2 text-xs text-[var(--muted)]">
           This is the same single sign-on used by the <strong>Handychapter</strong> app &mdash; one
-          account works across both. If you&apos;ve already linked Google and phone together in
-          Handychapter, either one will sign you in here too.
+          Google account works across both.
         </div>
 
+        {/* Phone sign-in disabled for now -- Google only. `mode` stays "google", so the phone
+            form below never renders. Uncomment this toggle to bring it back.
         <div className="flex rounded-md border border-[var(--line)] p-1 text-sm font-medium">
           <button
             type="button"
@@ -149,6 +150,7 @@ export default function LoginPage() {
             Phone
           </button>
         </div>
+        */}
 
         {error && (
           <div className="rounded-md border border-[var(--danger)] bg-[#fbeae7] px-3 py-2 text-sm text-[var(--danger)]">
