@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { generateRenewalTasks } from "@/lib/renewals/tasks";
 
 export async function GET(request: Request) {
@@ -10,6 +11,7 @@ export async function GET(request: Request) {
 
   try {
     const result = await generateRenewalTasks();
+    await invalidateCache([CACHE_TAGS.renewals]);
     return Response.json(result);
   } catch (error) {
     return Response.json(

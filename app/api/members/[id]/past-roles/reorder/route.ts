@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { buildRoleOrderUpdates } from "@/lib/roles";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -47,5 +48,6 @@ export async function PATCH(
     }
   }
 
+  await invalidateCache([CACHE_TAGS.members]);
   return Response.json({ ok: true });
 }

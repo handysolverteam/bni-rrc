@@ -1,3 +1,4 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { sanitizeRoleName, normalizeRoleName } from "@/lib/roles";
 import { getServiceSupabase } from "@/lib/supabase/server";
 
@@ -28,5 +29,6 @@ export async function POST(request: Request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
+  await invalidateCache([CACHE_TAGS.members]);
   return Response.json({ role: data }, { status: 201 });
 }

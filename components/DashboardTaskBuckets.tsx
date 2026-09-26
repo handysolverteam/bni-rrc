@@ -44,6 +44,7 @@ export default function DashboardTaskBuckets({ cycles }: { cycles: DashboardCycl
                 buckets[key].map((task) => (
                   <Link
                     key={task.id}
+                    prefetch
                     className="focus-ring block rounded-md border border-[var(--line)] bg-white p-3 hover:border-[var(--accent)]"
                     href={`/members/${task.member.id}`}
                   >

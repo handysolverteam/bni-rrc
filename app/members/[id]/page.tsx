@@ -1,8 +1,8 @@
 import Link from "next/link";
 import MemberDetail from "@/components/MemberDetail";
-import { getMemberDetail } from "@/lib/renewals/data";
+import { getMemberDetail } from "@/lib/cache";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function MemberPage({
   params,

@@ -1,8 +1,8 @@
 import DashboardKanban from "@/components/DashboardKanban";
-import { getDashboardCycles } from "@/lib/renewals/data";
+import { getDashboardCycles } from "@/lib/cache";
 import type { DashboardCycle } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function DashboardPage() {
   let cycles: DashboardCycle[] = [];

@@ -1,4 +1,4 @@
-import { getMemberDetail } from "@/lib/renewals/data";
+import { getMemberDetail } from "@/lib/cache";
 import MemberPerformance from "./MemberPerformance";
 
 export default async function MemberPerformanceRoute({
