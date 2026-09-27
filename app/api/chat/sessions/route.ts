@@ -1,5 +1,6 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { requireChatAuth } from "@/lib/chat/auth";
+import { requireApiAuth } from "@/lib/require-api-auth";
+import { internalErrorResponse } from "@/lib/api-errors";
 
 export interface ChatSessionSummary {
   session_id: string;
@@ -10,7 +11,7 @@ export interface ChatSessionSummary {
 
 export async function GET(request: Request) {
   try {
-    await requireChatAuth(request);
+    await requireApiAuth(request);
   } catch {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
       .limit(500);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return internalErrorResponse(error, "Failed to load chat sessions.");
     }
 
     const sessionsMap = new Map<
@@ -68,9 +69,6 @@ export async function GET(request: Request) {
 
     return Response.json({ sessions });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Failed to load chat sessions." },
-      { status: 500 },
-    );
+    return internalErrorResponse(error, "Failed to load chat sessions.");
   }
 }

@@ -2,6 +2,7 @@
 
 import { startTransition, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { authedFetch } from "@/lib/auth-token";
 import type { MemberAlias } from "@/lib/types";
 
 type MemberAliasesSectionProps = {
@@ -39,7 +40,7 @@ export default function MemberAliasesSection({
     setBusyKey("add-alias");
     setError(null);
 
-    const response = await fetch(`/api/members/${memberId}/aliases`, {
+    const response = await authedFetch(`/api/members/${memberId}/aliases`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ alias_name: aliasName }),
@@ -60,7 +61,7 @@ export default function MemberAliasesSection({
     setBusyKey(`remove-${aliasId}`);
     setError(null);
 
-    const response = await fetch(`/api/members/${memberId}/aliases/${aliasId}`, {
+    const response = await authedFetch(`/api/members/${memberId}/aliases/${aliasId}`, {
       method: "DELETE",
     });
 

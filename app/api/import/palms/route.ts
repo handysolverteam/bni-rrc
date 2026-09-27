@@ -1,8 +1,25 @@
 import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { importPalmsChapterSummaryReports } from "@/lib/renewals/palms-database-import";
+import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
+import {
+  contentLengthExceedsLimit,
+  filesExceedLimit,
+  importTooLargeResponse,
+} from "@/lib/import-guard";
+import { internalErrorResponse } from "@/lib/api-errors";
 
 export async function POST(request: Request) {
   try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
+  try {
+    if (contentLengthExceedsLimit(request)) {
+      return importTooLargeResponse();
+    }
+
     const formData = await request.formData();
     const files = [
       ...formData.getAll("files"),
@@ -11,6 +28,10 @@ export async function POST(request: Request) {
 
     if (files.length === 0) {
       return Response.json({ error: "At least one .xls file is required." }, { status: 400 });
+    }
+
+    if (filesExceedLimit(files)) {
+      return importTooLargeResponse();
     }
 
     const invalidFile = files.find((file) => !file.name.toLowerCase().endsWith(".xls"));
@@ -33,9 +54,6 @@ export async function POST(request: Request) {
     await invalidateCache([CACHE_TAGS.members, CACHE_TAGS.imports]);
     return Response.json(result);
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Import failed" },
-      { status: 500 },
-    );
+    return internalErrorResponse(error, "Import failed.");
   }
 }

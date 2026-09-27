@@ -2,7 +2,9 @@ import { getChatSnapshot } from "@/lib/chat/snapshot";
 import { askGemini } from "@/lib/chat/prompt";
 import { analyzeLocalChapterQuery } from "@/lib/chat/localAiEngine";
 import { resolveOptionAction } from "@/lib/chat/actions";
-import { requireChatAuth } from "@/lib/chat/auth";
+import { requireApiAuth } from "@/lib/require-api-auth";
+import { chatRateLimiter } from "@/lib/rate-limit";
+import { internalErrorResponse } from "@/lib/api-errors";
 import type { ChatMessage, ChatOption } from "@/lib/chat/types";
 
 /**
@@ -12,10 +14,18 @@ import type { ChatMessage, ChatOption } from "@/lib/chat/types";
  * reply text + follow-up options.
  */
 export async function POST(request: Request) {
+  let user;
   try {
-    await requireChatAuth(request);
+    user = await requireApiAuth(request);
   } catch {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  if (chatRateLimiter.isRateLimited(`chat:${user.uid}`)) {
+    return Response.json(
+      { error: "Too many requests. Please wait a moment and try again." },
+      { status: 429 },
+    );
   }
 
   const body = (await request.json().catch(() => null)) as
@@ -102,9 +112,6 @@ REGENERATION INSTRUCTIONS:
       source,
     });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Failed to generate a reply." },
-      { status: 500 },
-    );
+    return internalErrorResponse(error, "Failed to generate a reply.");
   }
 }

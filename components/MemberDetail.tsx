@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { authedFetch } from "@/lib/auth-token";
 import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
 import { sortTrafficLightHistoryForDisplay } from "@/lib/renewals/traffic-light-history";
 import type { DashboardCycle, Member, MemberAlias } from "@/lib/types";
@@ -27,7 +28,7 @@ export default function MemberDetail({ detail }: { detail: MemberDetailPayload }
       return;
     }
 
-    await fetch(`/api/renewal-cycles/${cycle.id}`, {
+    await authedFetch(`/api/renewal-cycles/${cycle.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

@@ -215,10 +215,10 @@ describe("analyzeLocalChapterQuery", () => {
     expect(analyzeLocalChapterQuery("hello", snapshot)).toContain("What would you like");
     const redSnap: ChatSnapshot = {
       ...snapshot,
-      members: [member({ name: "Rudhir Bhalla", latestColor: "red", latestScore: 40 })],
+      members: [member({ name: "Rohan Bhandari", latestColor: "red", latestScore: 40 })],
     };
     expect(analyzeLocalChapterQuery("help me find red members", redSnap)).toContain(
-      "Rudhir Bhalla",
+      "Rohan Bhandari",
     );
   });
 

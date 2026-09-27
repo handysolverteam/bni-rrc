@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { authedFetch } from "@/lib/auth-token";
 import { formatDisplayDate } from "@/lib/date-format";
 import { taskTypeLabels } from "@/lib/renewals/task-types";
 import { groupInboxTasks, type TaskInboxItem } from "@/lib/renewals/task-inbox-model";
@@ -44,7 +45,7 @@ export default function TaskInbox({ tasks }: { tasks: TaskInboxItem[] }) {
   const nextAction = tasks[0] ?? null;
 
   async function updateTask(id: string, status: RenewalTask["status"]) {
-    await fetch(`/api/tasks/${id}`, {
+    await authedFetch(`/api/tasks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),

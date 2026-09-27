@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { authedFetch } from "@/lib/auth-token";
 import { formatDisplayDate } from "@/lib/date-format";
 import { isActiveRenewalTaskType, taskTypeLabels } from "@/lib/renewals/task-types";
 import type { RenewalTask } from "@/lib/types";
@@ -10,7 +11,7 @@ export default function TaskList({ tasks }: { tasks: RenewalTask[] }) {
   const activeTasks = tasks.filter((task) => isActiveRenewalTaskType(task.task_type));
 
   async function updateTask(id: string, status: RenewalTask["status"]) {
-    await fetch(`/api/tasks/${id}`, {
+    await authedFetch(`/api/tasks/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),

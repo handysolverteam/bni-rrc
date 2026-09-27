@@ -1,21 +1,26 @@
 import { CACHE_TAGS, getMemberDetail, invalidateCache } from "@/lib/cache";
 import { normalizeAliasName, sanitizeAliasName } from "@/lib/renewals/member-aliases";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
+import { internalErrorResponse } from "@/lib/api-errors";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
 
   try {
     const member = await getMemberDetail(id);
     return Response.json(member);
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Unable to fetch member" },
-      { status: 500 },
-    );
+    return internalErrorResponse(error, "Unable to fetch member.");
   }
 }
 
@@ -23,6 +28,12 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const nextName = sanitizeAliasName(typeof body?.name === "string" ? body.name : "");
@@ -39,7 +50,7 @@ export async function PATCH(
     .single();
 
   if (existingMemberError) {
-    return Response.json({ error: existingMemberError.message }, { status: 500 });
+    return internalErrorResponse(existingMemberError, "Unable to update member.");
   }
 
   const previousName = sanitizeAliasName(existingMember.name ?? "");
@@ -51,7 +62,7 @@ export async function PATCH(
     .single();
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return internalErrorResponse(error, "Unable to update member.");
   }
 
   if (previousName && normalizeAliasName(previousName) !== normalizeAliasName(nextName)) {
@@ -68,7 +79,7 @@ export async function PATCH(
       );
 
     if (aliasError) {
-      return Response.json({ error: aliasError.message }, { status: 500 });
+      return internalErrorResponse(aliasError, "Unable to save the previous name.");
     }
   }
 
