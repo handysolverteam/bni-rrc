@@ -165,5 +165,18 @@ export function parseMembershipDuesReport(xml: string): ParsedMembershipReport {
 }
 
 export function normalizeImportKey(value: string): string {
-  return value.trim().replace(/\s+/g, " ").toLowerCase();
+  return (
+    value
+      // Control/format chars are PDF/Excel artifacts, never identity
+      // ("Nitin Sharma￾Chef" -> "Nitin Sharma Chef").
+      .replace(/[\p{C}]/gu, " ")
+      // Apostrophes and periods carry no identity ("D'Souza" == "Dsouza").
+      .replace(/['’.`]/g, "")
+      .replace(/\./g, "")
+      // Hyphens are word separators ("Mary-Kate" == "Mary Kate").
+      .replace(/-/g, " ")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase()
+  );
 }

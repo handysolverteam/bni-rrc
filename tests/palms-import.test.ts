@@ -87,6 +87,80 @@ describe("parsePalmsChapterSummaryReport", () => {
   });
 });
 
+describe("parsePalmsChapterSummaryReport robustness", () => {
+  const HEADERS = [
+    "First Name", "Last Name", "P", "A", "L", "M", "S", "RGI", "RGO",
+    "RRI", "RRO", "V", "1-2-1", "TYFCB", "CEU", "T",
+  ];
+
+  function reportXml(dataRow: string[], opts?: { headers?: string[]; worksheet?: string }): string {
+    const cell = (value: string) => `<Cell><Data ss:Type="String">${value}</Data></Cell>`;
+    const row = (values: string[]) => `<Row>${values.map(cell).join("")}</Row>`;
+    // Title values sit away from the name columns (as in real exports) so
+    // title rows never parse as member rows.
+    const titleRow = (label: string, value: string) =>
+      `<Row>${cell(label)}<Cell ss:Index="5"><Data ss:Type="String">${value}</Data></Cell></Row>`;
+    const table = [
+      titleRow("Chapter:", "Influencers"),
+      titleRow("From:", "14-04-2026"),
+      titleRow("To:", "13/05/2026"),
+      row(opts?.headers ?? HEADERS),
+      row(dataRow),
+    ].join("");
+    const nameAttr = opts?.worksheet ?? 'ss:Name="Report"';
+    return `<?xml version="1.0"?><Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ${nameAttr}><Table>${table}</Table></Worksheet></Workbook>`;
+  }
+
+  function memberRow(overrides: string[]): string[] {
+    const base = ["Amit", "Gupta", "1", "0", "0", "0", "0", "1", "2", "0", "0", "3", "4", "500", "5", "6"];
+    overrides.forEach((value, index) => {
+      base[2 + index] = value;
+    });
+    return base;
+  }
+
+  it("treats dash numeric cells as zero instead of failing", () => {
+    const parsed = parsePalmsChapterSummaryReport(reportXml(memberRow(["-"])));
+    expect(parsed.rows[0]?.presentCount).toBe(0);
+  });
+
+  it("strips currency symbols from TYFCB", () => {
+    const base = ["Amit", "Gupta", "1", "0", "0", "0", "0", "1", "2", "0", "0", "3", "4", "₹1,200.00", "5", "6"];
+    expect(parsePalmsChapterSummaryReport(reportXml(base)).rows[0]?.tyfcb).toBe(1200);
+    const rs = [...base];
+    rs[13] = "Rs. 500";
+    expect(parsePalmsChapterSummaryReport(reportXml(rs)).rows[0]?.tyfcb).toBe(500);
+  });
+
+  it("decodes numeric XML entities in names", () => {
+    const parsed = parsePalmsChapterSummaryReport(
+      reportXml(["D&#39;Souza", "Patel", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "", "0", "0"]),
+    );
+    expect(parsed.rows[0]?.name).toBe("D'Souza Patel");
+  });
+
+  it("parses day-first report dates", () => {
+    const parsed = parsePalmsChapterSummaryReport(reportXml(memberRow(["1"])));
+    expect(parsed.reportFrom).toBe("2026-04-14");
+    expect(parsed.reportTo).toBe("2026-05-13");
+  });
+
+  it("matches lowercase headers", () => {
+    const parsed = parsePalmsChapterSummaryReport(
+      reportXml(memberRow(["1"]), { headers: HEADERS.map((h) => h.toLowerCase()) }),
+    );
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]?.name).toBe("Amit Gupta");
+  });
+
+  it("accepts a Report worksheet without the ss: prefix", () => {
+    const parsed = parsePalmsChapterSummaryReport(
+      reportXml(memberRow(["1"]), { worksheet: 'Name="Report"' }),
+    );
+    expect(parsed.rows).toHaveLength(1);
+  });
+});
+
 describe("validatePalmsReportWindow", () => {
   const baseReport: ParsedPalmsReport = {
     chapterName: "Influencers",

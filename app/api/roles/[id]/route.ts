@@ -2,6 +2,7 @@ import { normalizeRoleName, sanitizeRoleName } from "@/lib/roles";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
 import { internalErrorResponse } from "@/lib/api-errors";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 export async function PATCH(
   request: Request,
@@ -45,6 +46,8 @@ export async function PATCH(
     return internalErrorResponse(error, "Unable to update the role.");
   }
 
+  await invalidateCache([CACHE_TAGS.members]);
+
   return Response.json({ role: data });
 }
 
@@ -81,6 +84,8 @@ export async function DELETE(
   if (error) {
     return internalErrorResponse(error, "Unable to delete the role.");
   }
+
+  await invalidateCache([CACHE_TAGS.members]);
 
   return Response.json({ ok: true });
 }

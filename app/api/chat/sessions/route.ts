@@ -10,8 +10,9 @@ export interface ChatSessionSummary {
 }
 
 export async function GET(request: Request) {
+  let user;
   try {
-    await requireApiAuth(request);
+    user = await requireApiAuth(request);
   } catch {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("ai_chat_messages")
       .select("session_id, sender, text, created_at")
+      .eq("user_id", user.uid)
       .order("created_at", { ascending: false })
       .limit(500);
 

@@ -7,6 +7,9 @@ import { chatRateLimiter } from "@/lib/rate-limit";
 import { internalErrorResponse } from "@/lib/api-errors";
 import type { ChatMessage, ChatOption } from "@/lib/chat/types";
 
+/** Per-request message cap (DoS + LLM cost guard). */
+const MAX_CHAT_MESSAGE_LENGTH = 2000;
+
 /**
  * Chat generate endpoint. Builds the privacy-safe snapshot server-side, resolves
  * quick-option actions structurally, otherwise asks Gemini (server key) and falls
@@ -63,6 +66,9 @@ export async function POST(request: Request) {
     if (!message) {
       return Response.json({ error: "Missing message." }, { status: 400 });
     }
+    if (message.length > MAX_CHAT_MESSAGE_LENGTH) {
+      return Response.json({ error: "Message is too long." }, { status: 400 });
+    }
 
     const userName = body.userName?.trim() || "Member";
     const userCategory = body.userCategory?.trim() || "Chapter Member";
@@ -100,8 +106,17 @@ REGENERATION INSTRUCTIONS:
     }
 
     if (!text || !text.trim()) {
-      text = analyzeLocalChapterQuery(message, snapshot);
+      text = analyzeLocalChapterQuery(message, snapshot, userName);
       source = "local";
+      // The local engine is deterministic: without this note a Regenerate
+      // click would silently return the identical reply.
+      if (
+        body.regenerateTarget &&
+        text.trim() === body.regenerateTarget.trim()
+      ) {
+        text +=
+          "\n\n🔁 *Regenerated on request — the offline engine gives the same complete answer for the same question. Rephrase it, name a member, or pick a zone or stage for a different angle.*";
+      }
     }
 
     return Response.json({
