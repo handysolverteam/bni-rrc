@@ -143,7 +143,7 @@ stripped; `(...)` = full member detail reply.
 | 8.9 | `am i in the red zone` (as green Amit) | Own record showing the green zone |
 | 8.10 | `yes` (bare acknowledgement) | Overview (stateless limitation, documented) |
 | 8.11 | Regenerate with the offline engine (identical reply) | Same text + honesty note, never a silent repeat |
-| 8.12 | Message over 2000 chars (generate + history save) | 400 "Message is too long" |
+| 8.12 | Message over 2000 chars (generate) / 100k chars (history save) | 400 "Message is too long" |
 
 ## 12. Chat history privacy (per-user scoping)
 
@@ -154,7 +154,7 @@ another user's sessions. Automated in `tests/chat-history-routes.test.ts`.
 | # | Case | Expect |
 |---|------|--------|
 | 12.1 | GET history | Filters by caller `user_id` + `sessionId`; corrupt stored options → `[]`; missing `sessionId` → 400 |
-| 12.2 | POST history | Stamps caller `user_id`; rejects bad sender / empty / >2000 chars |
+| 12.2 | POST history | Stamps caller `user_id`; rejects bad sender / empty / >100k chars; long AI replies (directories, audits) save fine |
 | 12.3 | DELETE history | Always scoped to caller (single session or clear-all) |
 | 12.4 | GET sessions | Only the caller's sessions; user-less sessions hidden |
 | 12.5 | No bearer token | 401 on all four endpoints |
