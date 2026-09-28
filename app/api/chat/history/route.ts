@@ -5,8 +5,12 @@ import type { ChatMessage, ChatOption } from "@/lib/chat/types";
 
 const HISTORY_LIMIT = 200;
 
-/** Stored/per-request chat text cap (DoS + cost guard). */
-const MAX_CHAT_TEXT_LENGTH = 2000;
+/**
+ * Stored chat text cap. AI replies (member directories, audits) are several
+ * KB by design, so this only rejects absurd payloads. User input length is
+ * enforced separately at /api/chat/generate (LLM cost guard).
+ */
+const MAX_CHAT_TEXT_LENGTH = 100_000;
 
 export async function GET(request: Request) {
   let user;

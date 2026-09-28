@@ -110,8 +110,13 @@ describe("chat history routes are scoped to the caller", () => {
     ).toBe(400);
     expect((await historyPOST(post({ sender: "user", text: "   " }))).status).toBe(400);
     expect(
-      (await historyPOST(post({ sender: "user", text: "x".repeat(2001) }))).status,
+      (await historyPOST(post({ sender: "user", text: "x".repeat(100_001) }))).status,
     ).toBe(400);
+    const { stub: okStub } = chain({ data: { ...ROW, options: "[]" }, error: null });
+    mockedSupabase.mockReturnValue(okStub as never);
+    expect(
+      (await historyPOST(post({ sender: "ai", text: "y".repeat(5000) }))).status,
+    ).toBe(200);
   });
 
   it("DELETE history always scopes to the caller", async () => {
