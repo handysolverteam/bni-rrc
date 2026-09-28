@@ -2,8 +2,13 @@ import { getChatSnapshot } from "@/lib/chat/snapshot";
 import { askGemini } from "@/lib/chat/prompt";
 import { analyzeLocalChapterQuery } from "@/lib/chat/localAiEngine";
 import { resolveOptionAction } from "@/lib/chat/actions";
-import { requireChatAuth } from "@/lib/chat/auth";
+import { requireApiAuth } from "@/lib/require-api-auth";
+import { chatRateLimiter } from "@/lib/rate-limit";
+import { internalErrorResponse } from "@/lib/api-errors";
 import type { ChatMessage, ChatOption } from "@/lib/chat/types";
+
+/** Per-request message cap (DoS + LLM cost guard). */
+const MAX_CHAT_MESSAGE_LENGTH = 2000;
 
 /**
  * Chat generate endpoint. Builds the privacy-safe snapshot server-side, resolves
@@ -12,10 +17,18 @@ import type { ChatMessage, ChatOption } from "@/lib/chat/types";
  * reply text + follow-up options.
  */
 export async function POST(request: Request) {
+  let user;
   try {
-    await requireChatAuth(request);
+    user = await requireApiAuth(request);
   } catch {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  if (chatRateLimiter.isRateLimited(`chat:${user.uid}`)) {
+    return Response.json(
+      { error: "Too many requests. Please wait a moment and try again." },
+      { status: 429 },
+    );
   }
 
   const body = (await request.json().catch(() => null)) as
@@ -52,6 +65,9 @@ export async function POST(request: Request) {
     const message = body.message?.trim();
     if (!message) {
       return Response.json({ error: "Missing message." }, { status: 400 });
+    }
+    if (message.length > MAX_CHAT_MESSAGE_LENGTH) {
+      return Response.json({ error: "Message is too long." }, { status: 400 });
     }
 
     const userName = body.userName?.trim() || "Member";
@@ -90,8 +106,17 @@ REGENERATION INSTRUCTIONS:
     }
 
     if (!text || !text.trim()) {
-      text = analyzeLocalChapterQuery(message, snapshot);
+      text = analyzeLocalChapterQuery(message, snapshot, userName);
       source = "local";
+      // The local engine is deterministic: without this note a Regenerate
+      // click would silently return the identical reply.
+      if (
+        body.regenerateTarget &&
+        text.trim() === body.regenerateTarget.trim()
+      ) {
+        text +=
+          "\n\n🔁 *Regenerated on request — the offline engine gives the same complete answer for the same question. Rephrase it, name a member, or pick a zone or stage for a different angle.*";
+      }
     }
 
     return Response.json({
@@ -102,9 +127,6 @@ REGENERATION INSTRUCTIONS:
       source,
     });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Failed to generate a reply." },
-      { status: 500 },
-    );
+    return internalErrorResponse(error, "Failed to generate a reply.");
   }
 }

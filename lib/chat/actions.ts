@@ -43,7 +43,14 @@ export const chatStageNames = [
  * free-text local engine so both answer a specific stage identically.
  */
 export function stageMembersText(snapshot: ChatSnapshot, stage: string): string {
-  const stageMembers = snapshot.members.filter((m) => m.renewalStage === stage);
+  // Renewed/Dropped members outside the renewal work window carry a null
+  // renewalStage, so fall back to the cycle status for those two stages.
+  const stageMembers = snapshot.members.filter(
+    (m) =>
+      m.renewalStage === stage ||
+      (stage === "Renewed" && m.renewalStatus === "renewed") ||
+      (stage === "Dropped" && m.renewalStatus === "dropped"),
+  );
 
   if (stageMembers.length === 0) {
     return `📄 *${stage}*\n\nNo members are currently in the ${stage} stage.`;
@@ -198,6 +205,7 @@ export function resolveOptionAction(
 
     case "QUERY_ZONE": {
       const zone = String(option.payload?.zone ?? "");
+      if (!["green", "amber", "red", "grey"].includes(zone)) return zoneMenuReply();
       const zoneMembers = members.filter((m) => (m.latestColor ?? "grey") === zone);
 
       if (zoneMembers.length === 0) {

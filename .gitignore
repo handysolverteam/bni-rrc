@@ -1,6 +1,7 @@
 .idea/
 node_modules/
 .next/
+.next-alt/
 .env
 .env.local
 coverage/

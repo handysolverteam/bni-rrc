@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getMainMenuOptions, resolveOptionAction } from "../lib/chat/actions";
+import { resolveOptionAction } from "../lib/chat/actions";
+import type { ChatOption } from "../lib/chat/types";
 import type { ChatSnapshot, ChatSnapshotMember } from "../lib/chat/types";
 
 function member(overrides: Partial<ChatSnapshotMember>): ChatSnapshotMember {
@@ -10,25 +11,25 @@ function member(overrides: Partial<ChatSnapshotMember>): ChatSnapshotMember {
     memberSince: null,
     isCommittee: false,
     reportRole: null,
-    latestScore: 6.5,
+    latestScore: 70,
     latestColor: "green",
     latestReportMonth: "Apr",
     trafficHistory: [],
     monthlyReferrals: null,
     monthlyReferralsReceived: null,
     monthlyReportMonth: null,
-    palmsReferrals: 12,
-    palmsReferralsReceived: 6,
-    palmsOneToOne: 8,
-    palmsTyfcb: 5000,
-    palmsCeu: 4,
-    palmsVisitors: 2,
+    palmsReferrals: 5,
+    palmsReferralsReceived: 2,
+    palmsOneToOne: 3,
+    palmsTyfcb: 1000,
+    palmsCeu: 1,
+    palmsVisitors: 1,
     renewalStatus: "active",
     renewalDate: "2026-07-01",
-    renewalStage: "normal",
+    renewalStage: "Member Discussion",
     isTwoYear: false,
     openTaskCount: 0,
-    lifetimeSponsors: 1,
+    lifetimeSponsors: 0,
     pastYearSponsors: 0,
     lifetimeTrainings: 0,
     pastYearTrainings: 0,
@@ -43,106 +44,115 @@ const snapshot: ChatSnapshot = {
     memberCount: 2,
     committeeCount: 1,
     activeCycles: 2,
-    renewedCount: 1,
+    renewedCount: 0,
     droppedCount: 0,
-    averageScore: 6.5,
+    averageScore: 60,
     greenCount: 1,
-    amberCount: 1,
-    redCount: 0,
+    amberCount: 0,
+    redCount: 1,
     greyCount: 0,
-    totalTyfcb: 5000,
+    totalTyfcb: 1000,
   },
   members: [
+    member({ name: "Alice Advisory", isCommittee: true, reportRole: "Secretary" }),
     member({
-      name: "Alice Advisory",
-      industry: "Finance",
-      latestColor: "green",
-      latestScore: 7.2,
-      isCommittee: true,
-      reportRole: "Secretary",
-      palmsTyfcb: 5000,
-      renewalStatus: "renewed",
-      renewalStage: "Renewed",
-      openTaskCount: 0,
-      pastRoles: ["Secretary", "Treasurer"],
-    }),
-    member({
-      name: "Bob Realty",
-      industry: "Real Estate",
-      latestColor: "amber",
-      latestScore: 5.8,
+      name: "Rohan Red",
+      latestColor: "red",
+      latestScore: 40,
       palmsTyfcb: 0,
-      renewalStatus: "active",
-      renewalStage: "Critical Deadline",
-      openTaskCount: 2,
+      isCommittee: false,
+      reportRole: null,
     }),
   ],
 };
 
-describe("chat quick-option actions", () => {
-  it("returns a menu option for every main action", () => {
-    const options = getMainMenuOptions();
-    expect(options.length).toBe(5);
-    expect(options.map((o) => o.action)).toEqual([
-      "QUERY_PIPELINE",
-      "ZONE_MENU",
-      "QUERY_EXEC",
-      "QUERY_TYFCB",
-      "QUERY_COMMITTEE",
-    ]);
+function opt(action: string, payload?: Record<string, unknown>): ChatOption {
+  return { id: `opt_${action}`, label: action, action, payload };
+}
+
+describe("resolveOptionAction", () => {
+  it("opens the main menu with options", () => {
+    const reply = resolveOptionAction(opt("MAIN_MENU"), snapshot);
+    expect(reply.text).toContain("Main Menu");
+    expect(reply.options.length).toBeGreaterThan(0);
   });
 
-  it("lists members in the critical-deadline stage for QUERY_PIPELINE", () => {
-    const reply = resolveOptionAction(
-      { id: "opt_pipeline", label: "Pipeline", action: "QUERY_PIPELINE" },
-      snapshot,
-    );
-    expect(reply.text).toContain("Bob Realty");
-    expect(reply.text).toContain("Critical Deadline");
+  it("opens the zone menu with one option per zone", () => {
+    const reply = resolveOptionAction(opt("ZONE_MENU"), snapshot);
+    const actions = reply.options.map((o) => o.action);
+    expect(actions).toContain("QUERY_ZONE");
+    expect(reply.options.length).toBeGreaterThanOrEqual(4);
   });
 
-  it("returns a zone submenu for ZONE_MENU", () => {
-    const reply = resolveOptionAction(
-      { id: "opt_zones", label: "Zones", action: "ZONE_MENU" },
-      snapshot,
-    );
-    expect(reply.options.some((o) => o.action === "QUERY_ZONE")).toBe(true);
-    expect(reply.options.some((o) => o.payload?.zone === "green")).toBe(true);
+  it("summarizes the renewal pipeline by stage", () => {
+    const reply = resolveOptionAction(opt("QUERY_PIPELINE"), snapshot);
+    expect(reply.text).toContain("Renewal Pipeline Overview");
+    expect(reply.text).toContain("Member Discussion");
   });
 
-  it("lists green members for QUERY_ZONE with green payload", () => {
-    const reply = resolveOptionAction(
-      { id: "opt_zone_green", label: "Green", action: "QUERY_ZONE", payload: { zone: "green" } },
+  it("lists stage members and handles unknown stages", () => {
+    const known = resolveOptionAction(
+      opt("QUERY_STAGE", { stage: "Member Discussion" }),
       snapshot,
     );
-    expect(reply.text).toContain("Alice Advisory");
-    expect(reply.text).not.toContain("Bob Realty");
+    expect(known.text).toContain("Alice Advisory");
+    const unknown = resolveOptionAction(opt("QUERY_STAGE", { stage: "Bananas" }), snapshot);
+    expect(unknown.text).toContain("No members");
   });
 
-  it("lists only the requested stage for QUERY_STAGE", () => {
-    const reply = resolveOptionAction(
-      {
-        id: "opt_stage",
-        label: "Critical Deadline",
-        action: "QUERY_STAGE",
-        payload: { stage: "Critical Deadline" },
-      },
-      snapshot,
-    );
-    expect(reply.text).toContain("Bob Realty");
-    expect(reply.text).not.toContain("Alice Advisory");
+  it("audits a zone and falls back to the zone menu for unknown zones", () => {
+    const red = resolveOptionAction(opt("QUERY_ZONE", { zone: "red" }), snapshot);
+    expect(red.text).toContain("Rohan Red");
+    const bogus = resolveOptionAction(opt("QUERY_ZONE", { zone: "purple" }), snapshot);
+    expect(bogus.text).not.toContain("Grey Zone");
+    expect(bogus.text).toContain("Zone Breakdown");
   });
 
-  it("reports an empty stage for QUERY_STAGE", () => {
-    const reply = resolveOptionAction(
-      {
-        id: "opt_stage",
-        label: "Payment Pending",
-        action: "QUERY_STAGE",
-        payload: { stage: "Payment Pending" },
-      },
+  it("shows the executive overview with chapter totals", () => {
+    const reply = resolveOptionAction(opt("QUERY_EXEC"), snapshot);
+    expect(reply.text).toContain("NOVA BNI");
+    expect(reply.text).toContain("Total Members");
+  });
+
+  it("lists TYFCB leaders and handles missing data", () => {
+    const leaders = resolveOptionAction(opt("QUERY_TYFCB"), snapshot);
+    expect(leaders.text).toContain("Alice Advisory");
+    const empty: ChatSnapshot = {
+      ...snapshot,
+      members: [member({ name: "Broke Bob", palmsTyfcb: 0 })],
+    };
+    expect(resolveOptionAction(opt("QUERY_TYFCB"), empty).text).toContain("No TYFCB");
+  });
+
+  it("lists committee members and handles an empty committee", () => {
+    const full = resolveOptionAction(opt("QUERY_COMMITTEE"), snapshot);
+    expect(full.text).toContain("Alice Advisory");
+    expect(full.text).not.toContain("Rohan Red");
+    const empty: ChatSnapshot = {
+      ...snapshot,
+      members: [member({ name: "Solo Sam", isCommittee: false })],
+    };
+    expect(resolveOptionAction(opt("QUERY_COMMITTEE"), empty).text).toContain(
+      "No committee members",
+    );
+  });
+
+  it("compares two members side by side and handles bad payloads", () => {
+    const good = resolveOptionAction(
+      opt("COMPARE_MEMBERS", { left: "Alice Advisory", right: "Rohan Red" }),
       snapshot,
     );
-    expect(reply.text).toContain("No members are currently in the Payment Pending stage.");
+    expect(good.text).toContain("Side-by-Side Comparison");
+    expect(good.text).toContain("Alice Advisory");
+    expect(good.text).toContain("Rohan Red");
+    const bad = resolveOptionAction(
+      opt("COMPARE_MEMBERS", { left: "Alice Advisory", right: "Nobody" }),
+      snapshot,
+    );
+    expect(bad.text).toContain("Could not match");
+  });
+
+  it("falls back to the menu for unknown actions", () => {
+    expect(resolveOptionAction(opt("NOPE"), snapshot).text).toContain("Select an option");
   });
 });

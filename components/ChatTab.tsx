@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { firebaseAuth } from "@/lib/firebase/client";
-import { getCurrentIdToken } from "@/lib/chat/token";
+import { authedFetch } from "@/lib/auth-token";
 import { getWhatsAppUrl } from "@/lib/chat/format";
 import type { ChatMessage, ChatOption } from "@/lib/chat/types";
 
@@ -32,17 +32,7 @@ function renderFormattedText(text: string): React.ReactNode {
 const fmtTime = (date = new Date()) =>
   date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-async function authFetch(url: string, init: RequestInit = {}): Promise<Response> {
-  const token = await getCurrentIdToken();
-  return fetch(url, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init.headers ?? {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-}
+const authFetch = authedFetch;
 
 export default function ChatTab() {
   const { user } = useAuth();

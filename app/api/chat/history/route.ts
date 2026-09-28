@@ -1,12 +1,17 @@
 import { getServiceSupabase } from "@/lib/supabase/server";
-import { requireChatAuth } from "@/lib/chat/auth";
+import { requireApiAuth } from "@/lib/require-api-auth";
+import { internalErrorResponse } from "@/lib/api-errors";
 import type { ChatMessage, ChatOption } from "@/lib/chat/types";
 
 const HISTORY_LIMIT = 200;
 
+/** Stored/per-request chat text cap (DoS + cost guard). */
+const MAX_CHAT_TEXT_LENGTH = 2000;
+
 export async function GET(request: Request) {
+  let user;
   try {
-    await requireChatAuth(request);
+    user = await requireApiAuth(request);
   } catch {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -23,12 +28,13 @@ export async function GET(request: Request) {
     const { data, error } = await supabase
       .from("ai_chat_messages")
       .select("id, sender, text, options, created_at")
+      .eq("user_id", user.uid)
       .eq("session_id", sessionId)
       .order("created_at", { ascending: true })
       .limit(HISTORY_LIMIT);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return internalErrorResponse(error, "Chat history operation failed.");
     }
 
     const messages: ChatMessage[] = (data ?? []).map((row) => {
@@ -59,16 +65,14 @@ export async function GET(request: Request) {
 
     return Response.json({ messages });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Failed to load chat history." },
-      { status: 500 },
-    );
+    return internalErrorResponse(error, "Failed to load chat history.");
   }
 }
 
 export async function POST(request: Request) {
+  let user;
   try {
-    await requireChatAuth(request);
+    user = await requireApiAuth(request);
   } catch {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -88,6 +92,9 @@ export async function POST(request: Request) {
   if (!text) {
     return Response.json({ error: "Missing message text." }, { status: 400 });
   }
+  if (text.length > MAX_CHAT_TEXT_LENGTH) {
+    return Response.json({ error: "Message is too long." }, { status: 400 });
+  }
 
   try {
     const supabase = getServiceSupabase();
@@ -98,12 +105,13 @@ export async function POST(request: Request) {
         text,
         options: JSON.stringify(optionsPayload),
         session_id: sessionId,
+        user_id: user.uid,
       })
       .select("id, sender, text, options, created_at")
       .single();
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return internalErrorResponse(error, "Chat history operation failed.");
     }
 
     const row = data as { id: string; sender: string; text: string; options: unknown; created_at: string };
@@ -133,16 +141,14 @@ export async function POST(request: Request) {
 
     return Response.json({ message });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Failed to save message." },
-      { status: 500 },
-    );
+    return internalErrorResponse(error, "Failed to save message.");
   }
 }
 
 export async function DELETE(request: Request) {
+  let user;
   try {
-    await requireChatAuth(request);
+    user = await requireApiAuth(request);
   } catch {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
@@ -152,23 +158,21 @@ export async function DELETE(request: Request) {
 
   try {
     const supabase = getServiceSupabase();
-    let query = supabase.from("ai_chat_messages").delete();
+    // Always scoped to the caller: nobody can clear another user's history.
+    let query = supabase.from("ai_chat_messages").delete().eq("user_id", user.uid);
 
-    // Clear only the given session, or all history when no session is supplied.
+    // Clear only the given session, or all of the caller's history otherwise.
     if (sessionId) {
       query = query.eq("session_id", sessionId);
     }
 
     const { error } = await query;
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return internalErrorResponse(error, "Chat history operation failed.");
     }
 
     return Response.json({ ok: true });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Failed to clear history." },
-      { status: 500 },
-    );
+    return internalErrorResponse(error, "Failed to clear history.");
   }
 }

@@ -30,6 +30,25 @@ function splitName(name: string): string[] {
   return name.toLowerCase().split(/\s+/).filter(Boolean);
 }
 
+/**
+ * Name comparison form: lowercase, no apostrophes/hyphens, so "D'Souza"
+ * matches "dsouza" and "Mary-Kate" matches "mary kate".
+ */
+function plainName(name: string): string {
+  return name.toLowerCase().replace(/['’`\-]/g, "");
+}
+
+/** Zero-activity phrasings ("who has zero 1-to-1s", "who brought no visitors"). */
+function wantsNoActivity(lowerQuery: string): boolean {
+  return (
+    lowerQuery.includes("zero") ||
+    lowerQuery.includes("no ") ||
+    lowerQuery.includes("none") ||
+    lowerQuery.includes("without") ||
+    lowerQuery.includes("never")
+  );
+}
+
 function parseIsoDate(value: string | null): number | null {
   if (!value) return null;
   const time = new Date(`${value.slice(0, 10)}T00:00:00Z`).getTime();
@@ -77,11 +96,12 @@ function slippedFromGreen(history: TrafficHistoryPoint[]): boolean {
 }
 
 function matchesQuery(memberName: string, lowerQuery: string): boolean {
-  const fullName = memberName.toLowerCase().trim();
+  const fullName = plainName(memberName).trim();
   if (!fullName || fullName.length < 2) return false;
-  if (lowerQuery.includes(fullName)) return true;
-  const parts = splitName(memberName);
-  return parts.some((part) => part.length >= 3 && lowerQuery.includes(part));
+  const plainQuery = plainName(lowerQuery);
+  if (plainQuery.includes(fullName)) return true;
+  const parts = splitName(memberName).map((part) => plainName(part));
+  return parts.some((part) => part.length >= 3 && plainQuery.includes(part));
 }
 
 function memberDetail(member: ChatSnapshotMember): string {
@@ -116,31 +136,138 @@ function memberDetail(member: ChatSnapshotMember): string {
 export function analyzeLocalChapterQuery(
   prompt: string,
   snapshot: ChatSnapshot,
+  userName?: string,
 ): string {
-  const lower = (prompt || "").toLowerCase().trim();
+  const lower = (prompt || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[?!.,;:]+$/, "");
   const members = snapshot.members;
 
-  // 1. Compare two members
+  // 0. Contact details are never available (privacy boundary wins over lookup).
+  if (
+    lower.includes("email") ||
+    lower.includes("phone") ||
+    lower.includes("contact") ||
+    lower.includes("mobile")
+  ) {
+    return (
+      `🔒 *Contact details aren't something I can share.*\n\n` +
+      `I don't have access to members' personal phone numbers, email addresses or other contact details — and I never display them in chat.\n\n` +
+      `❓ *Want a member's renewal or performance record instead? Just ask by name.*`
+    );
+  }
+
+  const matchedMembers = members.filter((m) => matchesQuery(m.name, lower));
+  const exactMatches = members.filter((m) => {
+    const fullName = plainName(m.name).trim();
+    return fullName.length >= 2 && plainName(lower).includes(fullName);
+  });
+
+  // 0b. Self reference ("my renewal", "how am i doing") resolves against the
+  // signed-in display name. A named member in the same query wins ("my friend
+  // Alice" looks up Alice, not you).
+  const selfName = plainName(userName || "").trim();
+  const plainSelf = selfName;
+  const selfCandidates =
+    plainSelf && plainSelf !== "member"
+      ? members.filter((m) => {
+          const full = plainName(m.name).trim();
+          if (full.length < 2) return false;
+          if (plainSelf.includes(full)) return true;
+          return full
+            .split(/\s+/)
+            .some((part) => part.length >= 3 && plainSelf.includes(part));
+        })
+      : [];
+  const self =
+    selfCandidates.length === 1 ? selfCandidates[0] : undefined;
+  const selfRef =
+    /\b(my|mine|myself)\b/.test(lower) ||
+    lower.includes("about me") ||
+    lower.includes("for me") ||
+    /\bam i\b/.test(lower);
+  const selfWords = selfRef || /\b(me|i)\b/.test(lower);
+
+  // 1. Compare two members ("compare A and B", "A vs B", "A and B"). "Me"
+  // resolves to the signed-in member.
   const isComparison =
     lower.includes("compare") ||
     lower.includes(" vs ") ||
     lower.includes(" versus ") ||
-    lower.includes("difference between");
+    lower.includes("difference between") ||
+    lower.includes("v/s") ||
+    /\bvs\.?\b/.test(lower);
+  const pairWords =
+    lower.includes(" and ") ||
+    lower.includes(",") ||
+    lower.includes(" & ") ||
+    lower.includes(" plus ") ||
+    lower.includes(" with ");
+  const wordCount = lower.split(/\s+/).filter(Boolean).length;
+  const comparePool = [...matchedMembers];
+  if (selfWords && self && !comparePool.includes(self)) comparePool.push(self);
+  const isPair =
+    !isComparison &&
+    pairWords &&
+    (exactMatches.length === 2 || (comparePool.length === 2 && wordCount <= 4));
+  if ((isComparison || isPair) && comparePool.length >= 2) {
+    const [left, right] = (
+      isPair && exactMatches.length === 2 ? exactMatches : comparePool
+    ).slice(0, 2);
+    if (left && right) {
+      return (
+        `📊 *Member Comparison* (${snapshot.chapterName})\n\n` +
+        `${memberDetail(left)}\n\n` +
+        `${memberDetail(right)}\n\n` +
+        `❓ *Would you like me to generate a 1-to-1 invitation template to pair them?*`
+      );
+    }
+  }
 
-  const matchedMembers = members.filter((m) => matchesQuery(m.name, lower));
-  if (isComparison && matchedMembers.length >= 2) {
-    const [left, right] = matchedMembers.slice(0, 2);
+  // 1b. Self lookup when no named member matched.
+  if (selfRef && matchedMembers.length === 0) {
+    if (self) {
+      return `${memberDetail(self)}\n\n❓ *Anything else about your record, or shall I look up another member?*`;
+    }
+    if (selfCandidates.length > 1) {
+      let res = `👥 *Your account ("${(userName || "").trim()}") matches several members:*\n\n`;
+      selfCandidates.slice(0, 10).forEach((m, idx) => {
+        res += `${idx + 1}. ${memberLine(m)}\n`;
+      });
+      return res + `\n❓ *Please reply with your full name.*`;
+    }
+    const signedIn =
+      selfName && selfName !== "member" ? ` (signed in as "${(userName || "").trim()}")` : "";
     return (
-      `📊 *Member Comparison* (${snapshot.chapterName})\n\n` +
-      `${memberDetail(left)}\n\n` +
-      `${memberDetail(right)}\n\n` +
-      `❓ *Would you like me to generate a 1-to-1 invitation template to pair them?*`
+      `🔍 *I couldn't tell which member you are${signedIn}.*\n\n` +
+      `Reply with your full name and I'll pull up your record.\n\n` +
+      `❓ *Want the full member directory instead?*`
     );
   }
 
-  // 2. Member lookup (single)
-  if (matchedMembers.length === 1) {
-    return `${memberDetail(matchedMembers[0])}\n\n❓ *Would you like me to look up another member or run a zone audit?*`;
+  // 2. Member lookup (single). Prefer an exact full-name hit: with dozens of
+  // members, shared first/last names are common, and the exact hit must win
+  // over partial matches ("amit gupta details" with two Amits still resolves).
+  const single =
+    exactMatches.length === 1
+      ? exactMatches[0]
+      : matchedMembers.length === 1
+        ? matchedMembers[0]
+        : undefined;
+  if (single) {
+    return `${memberDetail(single)}\n\n❓ *Would you like me to look up another member or run a zone audit?*`;
+  }
+
+  // 2b. Ambiguous name: list the candidates instead of silently falling
+  // through to the generic chapter overview.
+  const ambiguous = exactMatches.length > 1 ? exactMatches : matchedMembers;
+  if (ambiguous.length > 1) {
+    let res = `👥 *Multiple members match "${prompt.trim()}" (${ambiguous.length})*\n\n`;
+    ambiguous.slice(0, 10).forEach((m, idx) => {
+      res += `${idx + 1}. ${memberLine(m)}\n`;
+    });
+    return res + `\n❓ *Please reply with the full name of the member you want.*`;
   }
 
   // 3. Industry filter ("members in Commercial Real Estate")
@@ -192,6 +319,14 @@ export function analyzeLocalChapterQuery(
     );
   }
 
+  // 5b. Reversed stage phrasing ("pending documents", "document status").
+  if (lower.includes("document")) {
+    return (
+      stageMembersText(snapshot, "Documents Pending") +
+      `\n❓ *Want another stage or a specific member's full record?*`
+    );
+  }
+
   // 6. Two-year renewal terms (before the pipeline branch: the query contains "renewal")
   if (
     lower.includes("2-year") ||
@@ -217,7 +352,11 @@ export function analyzeLocalChapterQuery(
     lower.includes("open task") ||
     lower.includes("most task") ||
     lower.includes("pending task") ||
-    lower.includes("task load")
+    lower.includes("task load") ||
+    lower === "tasks" ||
+    lower.includes("all tasks") ||
+    lower.includes("show tasks") ||
+    lower.includes("task list")
   ) {
     const withOpen = members
       .filter((m) => m.openTaskCount > 0)
@@ -258,7 +397,10 @@ export function analyzeLocalChapterQuery(
     lower.includes("due in") ||
     lower.includes("due this") ||
     lower.includes("due next") ||
-    lower.includes("due soon")
+    lower.includes("due soon") ||
+    lower.includes("due today") ||
+    lower.includes("due tonight") ||
+    lower.includes("due tomorrow")
   ) {
     let days = 60;
     const windowMatch = lower.match(/(\d+)\s*(day|week|month)/);
@@ -269,6 +411,8 @@ export function analyzeLocalChapterQuery(
         : windowMatch[2].startsWith("month")
           ? count * 30
           : count;
+    } else if (lower.includes("due today") || lower.includes("due tomorrow")) {
+      days = 1;
     }
     const today = startOfTodayUtc();
     const upcoming = members
@@ -368,12 +512,27 @@ export function analyzeLocalChapterQuery(
     return res + `\n❓ *Want a re-engagement plan for any of them?*`;
   }
 
-  // 13. Zone audits
+  // 13. Zone audits. A leaderboard metric in the query wins over a zone word
+  // ("referral leaders" means referrals, not Green).
+  const hasMetricWords =
+    lower.includes("referral") ||
+    lower.includes("1-to-1") ||
+    lower.includes("1 to 1") ||
+    lower.includes("one to one") ||
+    lower.includes("one-to-one") ||
+    lower.includes("121") ||
+    lower.includes("ceu") ||
+    lower.includes("visitor");
   if (
-    lower.includes("green") ||
-    lower.includes("top performer") ||
-    lower.includes("leader") ||
-    lower.includes("best member")
+    !hasMetricWords &&
+    (lower.includes("green") ||
+      lower.includes("top performer") ||
+      lower.includes("leader") ||
+      lower.includes("best member") ||
+      lower.includes("highest score") ||
+      lower.includes("best score") ||
+      lower.includes("top score") ||
+      lower === "best")
   ) {
     const greenMembers = members.filter((m) => m.latestColor === "green");
     if (greenMembers.length === 0) {
@@ -389,11 +548,15 @@ export function analyzeLocalChapterQuery(
   }
 
   if (
-    lower.includes("red") ||
-    lower.includes("support") ||
-    lower.includes("low score") ||
-    lower.includes("alert") ||
-    lower.includes("urgent")
+    !hasMetricWords &&
+    (lower.includes("red") ||
+      lower.includes("support") ||
+      lower.includes("low score") ||
+      lower.includes("lowest score") ||
+      lower.includes("worst score") ||
+      lower.includes("worst") ||
+      lower.includes("alert") ||
+      lower.includes("urgent"))
   ) {
     const redMembers = members.filter((m) => m.latestColor === "red");
     if (redMembers.length === 0) {
@@ -408,10 +571,11 @@ export function analyzeLocalChapterQuery(
   }
 
   if (
-    lower.includes("amber") ||
-    lower.includes("yellow") ||
-    lower.includes("growth") ||
-    lower.includes("candidate")
+    !hasMetricWords &&
+    (lower.includes("amber") ||
+      lower.includes("yellow") ||
+      lower.includes("growth") ||
+      lower.includes("candidate"))
   ) {
     const amberMembers = members.filter((m) => m.latestColor === "amber");
     if (amberMembers.length === 0) {
@@ -426,10 +590,11 @@ export function analyzeLocalChapterQuery(
   }
 
   if (
-    lower.includes("grey") ||
-    lower.includes("gray") ||
-    lower.includes("no score") ||
-    lower.includes("unscored")
+    !hasMetricWords &&
+    (lower.includes("grey") ||
+      lower.includes("gray") ||
+      lower.includes("no score") ||
+      lower.includes("unscored"))
   ) {
     const greyMembers = members.filter((m) => (m.latestColor ?? "grey") === "grey");
     if (greyMembers.length === 0) {
@@ -441,6 +606,36 @@ export function analyzeLocalChapterQuery(
       res += `${idx + 1}. *${m.name}* — ${m.latestScore != null ? `${m.latestScore}/100 pts` : "no score yet"}${streak >= 2 ? ` | Grey for ${streak} consecutive reports` : ""}${m.renewalStage ? ` (Renewal: ${m.renewalStage})` : ""}\n`;
     });
     return res + `\n❓ *Want me to flag these for the next traffic-light report?*`;
+  }
+
+  // 13b. Overall zone breakdown ("zones", "traffic lights", "zone summary")
+  if (
+    lower === "zones" ||
+    lower === "zone" ||
+    lower.includes("zone breakdown") ||
+    lower.includes("zone summary") ||
+    lower.includes("all zones") ||
+    lower.includes("traffic")
+  ) {
+    const inZone = (color: string) =>
+      members
+        .filter((m) => (m.latestColor ?? "grey") === color)
+        .sort((a, b) => (b.latestScore ?? 0) - (a.latestScore ?? 0));
+    const green = inZone("green");
+    const amber = inZone("amber");
+    const red = inZone("red");
+    const grey = inZone("grey");
+    let res =
+      `🚦 *Zone Breakdown (${snapshot.chapterName})*\n\n` +
+      `• 🟢 Green: ${green.length} | 🟡 Amber: ${amber.length} | 🔴 Red: ${red.length} | ⚪ Grey: ${grey.length}\n\n`;
+    if (red.length > 0) {
+      res += `*Needs attention (Red):*\n`;
+      red.slice(0, 5).forEach((m, idx) => {
+        res += `${idx + 1}. ${memberLine(m)}\n`;
+      });
+      res += `\n`;
+    }
+    return res + `❓ *Want a full audit of a specific zone (Green, Amber, Red, Grey)?*`;
   }
 
   // 14. Performance leaderboards (referrals, 1-to-1s, CEU, visitors)
@@ -473,27 +668,29 @@ export function analyzeLocalChapterQuery(
       lower.includes("didn't") ||
       lower.includes("did not") ||
       lower.includes("never");
-    const givenOf = (m: ChatSnapshotMember) => Number(m.palmsReferrals ?? 0);
+    const rankReceived = lower.includes("received");
+    const valueOf = (m: ChatSnapshotMember) =>
+      Number((rankReceived ? m.palmsReferralsReceived : m.palmsReferrals) ?? 0);
     if (wantsZeros) {
       const zeros = members
-        .filter((m) => givenOf(m) === 0)
+        .filter((m) => valueOf(m) === 0)
         .sort((a, b) => a.name.localeCompare(b.name));
       if (zeros.length === 0) {
         return `🤝 *Referrals*\n\nEvery member has reported referrals — nobody is at zero.`;
       }
-      let res = `🤝 *No Referrals Reported (${zeros.length})*\n\n`;
+      let res = `🤝 *No Referrals ${rankReceived ? "Received" : "Reported"} (${zeros.length})*\n\n`;
       zeros.slice(0, 15).forEach((m, idx) => {
         res += `${idx + 1}. *${m.name}*${m.renewalStage ? ` (Renewal: ${m.renewalStage})` : ""}\n`;
       });
       return res + `\n❓ *Want a referral-generation nudge drafted for them?*`;
     }
-    const ranked = [...members].sort((a, b) => givenOf(b) - givenOf(a));
-    if (ranked.length === 0 || givenOf(ranked[0]) === 0) {
+    const ranked = [...members].sort((a, b) => valueOf(b) - valueOf(a));
+    if (ranked.length === 0 || valueOf(ranked[0]) === 0) {
       return `🤝 *Referral Leaders*\n\nNo referral activity has been reported yet.`;
     }
-    let res = `🤝 *Referral Leaders (Given)*\n\n`;
+    let res = `🤝 *Referral Leaders (${rankReceived ? "Received" : "Given"})*\n\n`;
     ranked.slice(0, 10).forEach((m, idx) => {
-      res += `${idx + 1}. *${m.name}* — ${givenOf(m)} given (${Number(m.palmsReferralsReceived ?? 0)} received)\n`;
+      res += `${idx + 1}. *${m.name}* — ${Number(m.palmsReferrals ?? 0)} given (${Number(m.palmsReferralsReceived ?? 0)} received)\n`;
     });
     return res + `\n❓ *Want to pair a top giver with someone at zero for a 1-to-1?*`;
   }
@@ -506,6 +703,19 @@ export function analyzeLocalChapterQuery(
     lower.includes("121")
   ) {
     const valueOf = (m: ChatSnapshotMember) => Number(m.palmsOneToOne ?? 0);
+    if (wantsNoActivity(lower)) {
+      const zeros = members
+        .filter((m) => valueOf(m) === 0)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (zeros.length === 0) {
+        return `☕ *1-to-1s*\n\nEveryone has reported 1-to-1s — nobody is at zero.`;
+      }
+      let res = `☕ *No 1-to-1s Reported (${zeros.length})*\n\n`;
+      zeros.slice(0, 15).forEach((m, idx) => {
+        res += `${idx + 1}. *${m.name}*${m.renewalStage ? ` (Renewal: ${m.renewalStage})` : ""}\n`;
+      });
+      return res + `\n❓ *Want 1-to-1 invitation templates for them?*`;
+    }
     const ranked = [...members].sort((a, b) => valueOf(b) - valueOf(a));
     if (ranked.length === 0 || valueOf(ranked[0]) === 0) {
       return `☕ *1-to-1 Leaders*\n\nNo 1-to-1 activity has been reported yet.`;
@@ -519,6 +729,19 @@ export function analyzeLocalChapterQuery(
 
   if (lower.includes("ceu")) {
     const valueOf = (m: ChatSnapshotMember) => Number(m.palmsCeu ?? 0);
+    if (wantsNoActivity(lower)) {
+      const zeros = members
+        .filter((m) => valueOf(m) === 0)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (zeros.length === 0) {
+        return `🎓 *CEU*\n\nEveryone has reported CEU — nobody is at zero.`;
+      }
+      let res = `🎓 *No CEU Reported (${zeros.length})*\n\n`;
+      zeros.slice(0, 15).forEach((m, idx) => {
+        res += `${idx + 1}. *${m.name}*${m.renewalStage ? ` (Renewal: ${m.renewalStage})` : ""}\n`;
+      });
+      return res + `\n❓ *Want to nudge them toward the next training module?*`;
+    }
     const ranked = [...members].sort((a, b) => valueOf(b) - valueOf(a));
     if (ranked.length === 0 || valueOf(ranked[0]) === 0) {
       return `🎓 *CEU Leaders*\n\nNo CEU (training education) activity has been reported yet.`;
@@ -532,6 +755,19 @@ export function analyzeLocalChapterQuery(
 
   if (lower.includes("visitor")) {
     const valueOf = (m: ChatSnapshotMember) => Number(m.palmsVisitors ?? 0);
+    if (wantsNoActivity(lower)) {
+      const zeros = members
+        .filter((m) => valueOf(m) === 0)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (zeros.length === 0) {
+        return `🙌 *Visitors*\n\nEveryone has brought visitors — nobody is at zero.`;
+      }
+      let res = `🙌 *No Visitors Reported (${zeros.length})*\n\n`;
+      zeros.slice(0, 15).forEach((m, idx) => {
+        res += `${idx + 1}. *${m.name}*${m.renewalStage ? ` (Renewal: ${m.renewalStage})` : ""}\n`;
+      });
+      return res + `\n❓ *Want visitor-invite templates for them?*`;
+    }
     const ranked = [...members].sort((a, b) => valueOf(b) - valueOf(a));
     if (ranked.length === 0 || valueOf(ranked[0]) === 0) {
       return `🙌 *Visitor Leaders*\n\nNo visitors have been reported yet.`;
@@ -543,29 +779,62 @@ export function analyzeLocalChapterQuery(
     return res + `\n❓ *Want visitor-invite templates for the next meeting?*`;
   }
 
-  // 15. Newest members
+  // 15. Newest / longest-tenured members
   if (
     lower.includes("newest") ||
     lower.includes("recently joined") ||
     lower.includes("new join") ||
     lower.includes("latest join") ||
-    lower.includes("new member")
+    lower.includes("new member") ||
+    lower.includes("join") ||
+    lower.includes("tenure") ||
+    lower.includes("oldest")
   ) {
+    const wantsAsc =
+      lower.includes("ascending") ||
+      /\basc\b/.test(lower) ||
+      lower.includes("oldest first") ||
+      (lower.includes("chronological") && !lower.includes("reverse"));
+    const wantsDesc =
+      lower.includes("descending") ||
+      /\bdesc\b/.test(lower) ||
+      lower.includes("newest first") ||
+      lower.includes("latest first") ||
+      lower.includes("reverse");
+    const oldestFirst =
+      lower.includes("oldest") || lower.includes("longest") || (wantsAsc && !wantsDesc);
+    const yearMatch = lower.match(/\b(19|20)\d{2}\b/);
+    const year = yearMatch ? yearMatch[0] : null;
     const dated = members
       .filter((m) => m.memberSince)
-      .sort((a, b) => String(b.memberSince).localeCompare(String(a.memberSince)));
-    if (dated.length === 0) {
-      return `🆕 *Newest Members*\n\nNo join dates are on record.`;
+      .sort((a, b) =>
+        oldestFirst
+          ? String(a.memberSince).localeCompare(String(b.memberSince))
+          : String(b.memberSince).localeCompare(String(a.memberSince)),
+      );
+    const listed = year
+      ? dated.filter((m) => (m.memberSince ?? "").startsWith(year))
+      : dated;
+    if (listed.length === 0) {
+      return year
+        ? `🆕 *Members Joined in ${year}*\n\nNo members joined in ${year} — try another year or ask for the newest members.`
+        : `🆕 *Newest Members*\n\nNo join dates are on record.`;
     }
-    let res = `🆕 *Newest Members*\n\n`;
-    dated.slice(0, 5).forEach((m, idx) => {
+    const title = year
+      ? `🆕 *Members Joined in ${year}*`
+      : oldestFirst
+        ? `🕰️ *Members by Join Date (Oldest First)*`
+        : `🆕 *Newest Members*`;
+    let res = `${title}\n\n`;
+    listed.slice(0, 5).forEach((m, idx) => {
       res += `${idx + 1}. *${m.name}* — since ${formatDisplayDate(m.memberSince)}${m.industry ? ` (${m.industry})` : ""}\n`;
     });
     return res + `\n❓ *Want a welcome-mentor pairing for any of them?*`;
   }
 
-  // 16. Past roles (before committee: specific former-role questions win)
-  const pastRoleHit = ["president", "vice president", "secretary", "treasurer"].find((role) =>
+  // 16. Past roles (before committee: specific former-role questions win).
+  // Longest names first so "vice president" wins over "president".
+  const pastRoleHit = ["vice president", "president", "secretary", "treasurer"].find((role) =>
     lower.includes(role),
   );
   if (
@@ -575,6 +844,7 @@ export function analyzeLocalChapterQuery(
     lower.includes("ex-president") ||
     pastRoleHit
   ) {
+    const wantsCurrent = lower.includes("current") || lower.includes("right now");
     const holders = members
       .filter((m) => {
         if (!pastRoleHit) return m.pastRoles.length > 0;
@@ -582,14 +852,20 @@ export function analyzeLocalChapterQuery(
           role.toLowerCase().includes(pastRoleHit),
         );
         const inCurrent = (m.reportRole ?? "").toLowerCase().includes(pastRoleHit);
+        if (wantsCurrent) return inCurrent;
         return inPast || inCurrent;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
     if (holders.length === 0) {
       return `📜 *Past Roles*\n\nNo past leadership roles are on record.`;
     }
+    const roleTitle = pastRoleHit
+      ? pastRoleHit.replace(/\b\w/g, (c) => c.toUpperCase())
+      : "";
     const title = pastRoleHit
-      ? `*Members with ${pastRoleHit.replace(/\b\w/g, (c) => c.toUpperCase())} experience*`
+      ? wantsCurrent && holders.length > 0
+        ? `*Current ${roleTitle}*`
+        : `*Members with ${roleTitle} experience*`
       : `*Past Leadership Roles*`;
     let res = `📜 ${title} (${holders.length})\n\n`;
     holders.forEach((m, idx) => {
@@ -643,14 +919,32 @@ export function analyzeLocalChapterQuery(
 
   // 19. Greetings / capabilities (kept near-last so real questions containing
   // "help"/"hello" still reach their content branch first)
+  if (lower.includes("thank")) {
+    return (
+      `🙏 *You're welcome!* Glad I could help.\n\n` +
+      `❓ *Is there anything else you'd like me to look up for ${snapshot.chapterName}?*`
+    );
+  }
+  if (lower === "bye" || lower.includes("goodbye") || lower.includes("see you")) {
+    return (
+      `👋 *Goodbye!* I'll be here whenever you need renewal, zone or member insights for ${snapshot.chapterName}.`
+    );
+  }
   if (
     lower === "hi" ||
     lower === "hello" ||
     lower === "hey" ||
+    /^(hi|hello|hey|good morning|good afternoon|good evening|morning|evening)\b/.test(
+      lower,
+    ) ||
     lower.includes("what can you do") ||
     lower.includes("help") ||
     lower.includes("who are you") ||
-    lower.includes("capabilities")
+    lower.includes("capabilities") ||
+    lower.includes("menu") ||
+    lower.includes("assist") ||
+    lower === "start" ||
+    lower.includes("start over")
   ) {
     return (
       `👋 *Hello! I am Chapter AI for ${snapshot.chapterName}.*\n\n` +
@@ -666,7 +960,24 @@ export function analyzeLocalChapterQuery(
     );
   }
 
-  // 20. Fallback summary + counter-question
+  // 20. Fallback summary + counter-question. When the query clearly asks for a
+  // person but no member matched, say so honestly instead of dumping the
+  // generic overview (only reached when no content branch above matched).
+  const looksLikeLookup =
+    lower.includes("detail") ||
+    lower.includes("profile") ||
+    lower.includes("who is") ||
+    lower.includes("tell me about") ||
+    lower.includes("look up") ||
+    lower.includes("lookup") ||
+    /\bfind\b/.test(lower);
+  if (looksLikeLookup && members.length > 0) {
+    return (
+      `🔍 *I couldn't find a member matching "${prompt.trim()}" in ${snapshot.chapterName}.*\n\n` +
+      `Please check the spelling or reply with the member's full name. You can also ask for the *member list* to browse the directory.\n\n` +
+      `❓ *Want the full member directory?*`
+    );
+  }
   const samples = members.slice(0, 2).map((m) => `*${m.name}*`).join(", ");
   return (
     `📊 *Chapter AI Overview for ${snapshot.chapterName}*\n` +

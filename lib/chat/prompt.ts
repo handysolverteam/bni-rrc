@@ -60,9 +60,11 @@ function buildSystemInstruction(
     .map((key) => `* INTENT ${key.toUpperCase()}: ${intentRules[key]}`)
     .join("\n");
 
+  const safeUser = cleanPromptField(userName) || "Member";
+  const safeCategory = cleanPromptField(userCategory) || "Chapter Member";
   return [
     `You are ${chatTrainingData.system_identity.name} for ${snapshot.chapterName}.`,
-    `You are speaking directly with ${userName} (${userCategory}).`,
+    `You are speaking directly with ${safeUser} (${safeCategory}).`,
     "",
     flattenDirectives({
       system_identity: chatTrainingData.system_identity,
@@ -91,9 +93,18 @@ function buildSystemInstruction(
   ].join("\n");
 }
 
+/** Client-controlled display fields must not smuggle newlines into the prompt. */
+function cleanPromptField(value: string): string {
+  return String(value ?? "")
+    .replace(/[\r\n\t]+/g, " ")
+    .trim()
+    .slice(0, 80);
+}
+
+/** Cap client-supplied history: last 10 turns, 1500 chars each (cost guard). */
 function formatHistory(history: ChatMessage[], userName: string): string {
   return (history ?? []).slice(-10)
-    .map((m) => `${m.sender === "user" ? userName : "Chapter AI"}: ${m.text}`)
+    .map((m) => `${m.sender === "user" ? userName : "Chapter AI"}: ${String(m.text ?? "").slice(0, 1500)}`)
     .join("\n");
 }
 
@@ -120,7 +131,7 @@ export async function askGemini(input: AskGeminiInput): Promise<string | null> {
     input.userCategory,
   );
 
-  const historyText = formatHistory(input.history ?? [], input.userName);
+  const historyText = formatHistory(input.history ?? [], cleanPromptField(input.userName) || "Member");
 
   const combinedPrompt = [
     systemInstruction,
@@ -144,7 +155,8 @@ export async function askGemini(input: AskGeminiInput): Promise<string | null> {
 
   for (const model of ACTIVE_GEMINI_MODELS) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      // Key travels in the header only -- never in the URL (server logs).
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
       const response = await fetch(url, {
         method: "POST",
         headers: {
@@ -152,6 +164,7 @@ export async function askGemini(input: AskGeminiInput): Promise<string | null> {
           "X-goog-api-key": apiKey,
         },
         body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(25_000),
       });
 
       if (!response.ok) {
