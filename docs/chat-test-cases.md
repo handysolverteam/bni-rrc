@@ -1,7 +1,7 @@
-# Test Case Catalog — Full Suite (275 cases)
+# Test Case Catalog — Full Suite (278 cases)
 
-Automated suite: **268 passed, 7 conditionally skipped** (`npx vitest run`,
-38 files). The 7 skipped (marked ⏭ below) need real report files from local
+Automated suite: **271 passed, 7 conditionally skipped** (`npx vitest run`,
+39 files). The 7 skipped (marked ⏭ below) need real report files from local
 disk (`C:\Users\rahul\Downloads\...`, absent on most machines) and skip
 automatically via `existsSync(...) ? it : it.skip`.
 
@@ -10,9 +10,9 @@ automatically via `existsSync(...) ? it : it.skip`.
   `tests/chat-actions.test.ts` (10 tests).
 - Part A2 (sections 12–14): chat API routes + Gemini client (20 tests).
 - Part B (section 11): every other test file, one row per automated case
-  (168 tests, incl. roles route cache + name-normalization + PALMS parser
-  robustness tests). 70 + 10 + 20 + 5 + 3 + 6 + 154 = 268 automated;
-  + 7 skipped = 275 total.
+  (171 tests, incl. roles route cache + name-normalization + PALMS parser
+  robustness + chat timestamp tests). 70 + 10 + 20 + 5 + 3 + 6 + 3 + 154 = 271
+  automated; + 7 skipped = 278 total.
 
 Run everything: `npx vitest run`
 Run chat only: `npx vitest run tests/chat-local-engine.test.ts tests/chat-actions.test.ts tests/chat-history-routes.test.ts tests/chat-generate-route.test.ts tests/chat-prompt.test.ts`
@@ -142,6 +142,7 @@ stripped; `(...)` = full member detail reply.
 | 8.8 | `my renewal status` signed in as `Member` / two-Amits as `Amit` | "couldn't tell" (no placeholder leak) / "matches several members" |
 | 8.9 | `am i in the red zone` (as green Amit) | Own record showing the green zone |
 | 8.10 | `yes` (bare acknowledgement) | Overview (stateless limitation, documented) |
+| 8.11 | History reload in IST (or any non-UTC zone) | Local times, never server UTC |
 | 8.11 | Regenerate with the offline engine (identical reply) | Same text + honesty note, never a silent repeat |
 | 8.12 | Message over 2000 chars (generate) / 100k chars (history save) | 400 "Message is too long" |
 

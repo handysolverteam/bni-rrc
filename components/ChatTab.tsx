@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { firebaseAuth } from "@/lib/firebase/client";
 import { authedFetch } from "@/lib/auth-token";
 import { getWhatsAppUrl } from "@/lib/chat/format";
+import { withLocalTimestamps } from "@/lib/chat/timestamps";
 import type { ChatMessage, ChatOption } from "@/lib/chat/types";
 
 function renderFormattedText(text: string): React.ReactNode {
@@ -99,7 +100,7 @@ export default function ChatTab() {
           messages: ChatMessage[];
         };
         if (serverMessages && serverMessages.length > 0) {
-          setMessages(serverMessages);
+          setMessages(withLocalTimestamps(serverMessages));
         } else {
           setMessages([
             {
