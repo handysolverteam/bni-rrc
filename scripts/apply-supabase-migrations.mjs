@@ -1,7 +1,31 @@
 import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function log(message) {
   process.stdout.write(`${message}\n`);
+}
+
+// Plain `node` does not load .env files (unlike `next`), so `npm run
+// migrate:deploy` never saw .env.local. Fill missing vars from it; real
+// environment values (e.g. on Vercel) always win.
+try {
+  const envLocalPath = join(dirname(fileURLToPath(import.meta.url)), "..", ".env.local");
+  if (existsSync(envLocalPath)) {
+    for (const line of readFileSync(envLocalPath, "utf8").split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
+      const idx = trimmed.indexOf("=");
+      const key = trimmed.slice(0, idx).trim();
+      const value = trimmed.slice(idx + 1).trim();
+      if (key && !(key in process.env)) {
+        process.env[key] = value;
+      }
+    }
+  }
+} catch {
+  // A broken .env.local must not block deploys that rely on real env vars.
 }
 
 function fail(message) {
@@ -29,12 +53,15 @@ if (!dbUrl) {
 
 log("Applying Supabase migrations with `supabase db push`...");
 
+const isWindows = process.platform === "win32";
 const result = spawnSync(
-  process.platform === "win32" ? "npx.cmd" : "npx",
+  isWindows ? "npx.cmd" : "npx",
   ["supabase", "db", "push", "--db-url", dbUrl, "--include-all"],
   {
     stdio: "inherit",
     env: process.env,
+    // npx.cmd is a batch file: spawning it without a shell throws EINVAL on Windows.
+    shell: isWindows,
   },
 );
 

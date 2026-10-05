@@ -1,8 +1,8 @@
 import TaskInbox from "@/components/TaskInbox";
-import { getTaskInboxItems } from "@/lib/renewals/task-inbox";
+import { getTaskInboxItems } from "@/lib/cache";
 import type { TaskInboxItem } from "@/lib/renewals/task-inbox-model";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function TaskInboxPage() {
   let tasks: TaskInboxItem[] = [];

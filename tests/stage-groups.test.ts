@@ -30,6 +30,7 @@ function cycle(stage: DashboardCycle["stage"]): DashboardCycle {
       industry: "Industry",
       sponsor: null,
       report_role: null,
+      member_since: null,
       is_committee: false,
     },
     latest_traffic_light: null,

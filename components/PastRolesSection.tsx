@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { authedFetch } from "@/lib/auth-token";
 import type { ChapterRole, MemberPastRoleEntry } from "@/lib/types";
 
 type PastRolesSectionProps = {
@@ -74,7 +75,7 @@ export default function PastRolesSection({
     setBusyKey("add-past-role");
     setError(null);
 
-    const response = await fetch(`/api/members/${memberId}/past-roles`, {
+    const response = await authedFetch(`/api/members/${memberId}/past-roles`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role_id: newRoleId }),
@@ -94,7 +95,7 @@ export default function PastRolesSection({
     setBusyKey(`remove-${assignmentId}`);
     setError(null);
 
-    const response = await fetch(`/api/members/${memberId}/past-roles/${assignmentId}`, {
+    const response = await authedFetch(`/api/members/${memberId}/past-roles/${assignmentId}`, {
       method: "DELETE",
     });
 
@@ -123,7 +124,7 @@ export default function PastRolesSection({
     setBusyKey(`reorder-${assignmentId}`);
     setError(null);
 
-    const response = await fetch(`/api/members/${memberId}/past-roles/reorder`, {
+    const response = await authedFetch(`/api/members/${memberId}/past-roles/reorder`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ assignment_ids: reordered.map((pastRole) => pastRole.id) }),
@@ -149,7 +150,7 @@ export default function PastRolesSection({
     setBusyKey("create-role");
     setError(null);
 
-    const response = await fetch("/api/roles", {
+    const response = await authedFetch("/api/roles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: newRoleName }),
@@ -172,7 +173,7 @@ export default function PastRolesSection({
     setBusyKey(`rename-${roleId}`);
     setError(null);
 
-    const response = await fetch(`/api/roles/${roleId}`, {
+    const response = await authedFetch(`/api/roles/${roleId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: draftName }),
@@ -192,7 +193,7 @@ export default function PastRolesSection({
     setBusyKey(`delete-${roleId}`);
     setError(null);
 
-    const response = await fetch(`/api/roles/${roleId}`, {
+    const response = await authedFetch(`/api/roles/${roleId}`, {
       method: "DELETE",
     });
 

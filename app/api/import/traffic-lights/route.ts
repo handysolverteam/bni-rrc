@@ -1,6 +1,13 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { PDFParse } from "pdf-parse";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
+import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
+import {
+  contentLengthExceedsLimit,
+  filesExceedLimit,
+  importTooLargeResponse,
+} from "@/lib/import-guard";
 import {
   formatImportError,
   importTrafficLightPdfScoreReport,
@@ -29,12 +36,26 @@ async function extractPdfText(file: File): Promise<string> {
 
 export async function POST(request: Request) {
   try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
+  try {
+    if (contentLengthExceedsLimit(request)) {
+      return importTooLargeResponse();
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
     const reportMonth = formData.get("reportMonth");
 
     if (!(file instanceof File)) {
       return Response.json({ error: "A .pdf or .xlsx file is required." }, { status: 400 });
+    }
+
+    if (filesExceedLimit([file])) {
+      return importTooLargeResponse();
     }
 
     const filename = file.name.toLowerCase();
@@ -50,6 +71,7 @@ export async function POST(request: Request) {
         file.name,
         normalizedReportMonth,
       );
+      await invalidateCache([CACHE_TAGS.renewals, CACHE_TAGS.members]);
       return Response.json(result);
     }
 
@@ -58,6 +80,7 @@ export async function POST(request: Request) {
       ? await importTrafficLightPdfScoreReport(text, file.name, normalizedReportMonth)
       : await importTrafficLightReport(text, file.name, normalizedReportMonth);
 
+    await invalidateCache([CACHE_TAGS.renewals, CACHE_TAGS.members]);
     return Response.json(result);
   } catch (error) {
     return Response.json(

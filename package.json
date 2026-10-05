@@ -16,7 +16,7 @@
     "@supabase/supabase-js": "^2.86.0",
     "firebase": "^12.19.0",
     "jose": "^6.2.12",
-    "next": "^16.1.6",
+    "next": "^16.3.6",
     "pdf-parse": "^2.4.5",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
@@ -28,7 +28,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.2",
-    "eslint-config-next": "^16.1.6",
+    "eslint-config-next": "^16.3.6",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "vitest": "^4.0.16"

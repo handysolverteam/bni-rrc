@@ -9,6 +9,7 @@ import { firebaseAuth, signOutFirebase } from "@/lib/firebase/client";
 import MobileNav from "@/components/MobileNav";
 import UserMenu from "@/components/UserMenu";
 import { getSsoPartnerUrls } from "@/lib/sso-partners";
+import { isSafeInternalPath, isSafeSsoReturnUrl } from "@/lib/sso-guard";
 
 const PUBLIC_PATHS = ["/login"];
 const SSO_ATTEMPTED_KEY = "bniRrcSsoAttempted";
@@ -35,6 +36,12 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
   const isPublicPath = PUBLIC_PATHS.includes(pathname);
+  const isNavActive = (href: string) =>
+    href === "/"
+      ? pathname === "/"
+      : href === "/tasks"
+        ? pathname === "/tasks"
+        : pathname === href || pathname.startsWith(`${href}/`);
 
   /**
    * Cross-app SSO with any trusted sibling app (see lib/sso-partners.ts). The contract is
@@ -60,7 +67,8 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
     if (ssoParam === "callback") {
       ssoHandledRef.current = true;
       const code = searchParams.get("ssoCode");
-      const redirectPath = searchParams.get("redirect") || "/";
+      const rawRedirectPath = searchParams.get("redirect") || "/";
+      const redirectPath = isSafeInternalPath(rawRedirectPath) ? rawRedirectPath : "/";
       const partnerIndex = Number(searchParams.get("partnerIndex") || "0");
       window.history.replaceState({}, "", pathname);
 
@@ -111,11 +119,20 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
       ssoHandledRef.current = true;
 
       const returnUrl = searchParams.get("return");
+      const safeReturn = isSafeSsoReturnUrl(returnUrl || "", window.location.origin, getSsoPartnerUrls());
       const finish = (query: string) => {
-        if (!returnUrl) return;
-        const separator = returnUrl.includes("?") ? "&" : "?";
+        if (!safeReturn) return;
+        const separator = returnUrl!.includes("?") ? "&" : "?";
         window.location.replace(`${returnUrl}${separator}${query}`);
       };
+
+      if (!safeReturn) {
+        // Unguarded `return` target (missing or attacker-controlled): do not mint a code or
+        // bounce anywhere. Treat the visit as a normal page load of this app.
+        window.history.replaceState({}, "", pathname);
+        queueMicrotask(() => setSsoBusy(false));
+        return;
+      }
 
       if (!user) {
         finish("ssoCode=none");
@@ -187,20 +204,41 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
             BNI Renewal CRM
           </Link>
           <nav className="hidden gap-2 text-sm md:flex">
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/"
+            >
               Dashboard
             </Link>
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/achievements">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/achievements") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/achievements"
+            >
               Achievements
             </Link>
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/tasks/inbox">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/tasks/inbox") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/tasks/inbox"
+            >
               Task Inbox
             </Link>
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/tasks">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/tasks") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/tasks"
+            >
               Task Buckets
             </Link>
-            <Link className="focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea]" href="/import">
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/import") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/import"
+            >
               Import
+            </Link>
+            <Link
+              className={`focus-ring flex min-h-11 items-center rounded-md px-3 py-2 hover:bg-[#eef1ea] ${isNavActive("/chat") ? "bg-[#eef1ea] font-medium" : ""}`}
+              href="/chat"
+            >
+              Chat
             </Link>
           </nav>
           <UserMenu />

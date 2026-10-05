@@ -1,10 +1,19 @@
 import { normalizeRoleName, sanitizeRoleName } from "@/lib/roles";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
+import { internalErrorResponse } from "@/lib/api-errors";
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const rawName = typeof body?.name === "string" ? body.name : "";
@@ -34,16 +43,24 @@ export async function PATCH(
       return Response.json({ error: "That role already exists." }, { status: 409 });
     }
 
-    return Response.json({ error: error.message }, { status: 500 });
+    return internalErrorResponse(error, "Unable to update the role.");
   }
+
+  await invalidateCache([CACHE_TAGS.members]);
 
   return Response.json({ role: data });
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
   const supabase = getServiceSupabase();
   const { count, error: countError } = await supabase
@@ -52,7 +69,7 @@ export async function DELETE(
     .eq("role_id", id);
 
   if (countError) {
-    return Response.json({ error: countError.message }, { status: 500 });
+    return internalErrorResponse(countError, "Unable to check role usage.");
   }
 
   if ((count ?? 0) > 0) {
@@ -65,8 +82,10 @@ export async function DELETE(
   const { error } = await supabase.from("chapter_roles").delete().eq("id", id);
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return internalErrorResponse(error, "Unable to delete the role.");
   }
+
+  await invalidateCache([CACHE_TAGS.members]);
 
   return Response.json({ ok: true });
 }

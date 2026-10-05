@@ -1,9 +1,18 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
+import { internalErrorResponse } from "@/lib/api-errors";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const roleId = typeof body?.role_id === "string" ? body.role_id : "";
@@ -21,7 +30,7 @@ export async function POST(
     .limit(1);
 
   if (existingAssignmentsError) {
-    return Response.json({ error: existingAssignmentsError.message }, { status: 500 });
+    return internalErrorResponse(existingAssignmentsError, "Unable to load existing roles.");
   }
 
   const nextDisplayOrder = (existingAssignments?.[0]?.display_order ?? -1) + 1;
@@ -40,8 +49,9 @@ export async function POST(
       return Response.json({ error: "That role is already added for this member." }, { status: 409 });
     }
 
-    return Response.json({ error: error.message }, { status: 500 });
+    return internalErrorResponse(error, "Unable to add the role.");
   }
 
+  await invalidateCache([CACHE_TAGS.members]);
   return Response.json({ pastRole: data }, { status: 201 });
 }

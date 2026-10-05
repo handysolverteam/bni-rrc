@@ -3,6 +3,7 @@
 import type { DragEvent, FormEvent } from "react";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { authedFetch } from "@/lib/auth-token";
 import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
 import type { PalmsMonthlyCoverage } from "@/lib/renewals/import-coverage";
 import { parsePalmsChapterSummaryReport } from "@/lib/renewals/palms-import";
@@ -85,7 +86,7 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
     setError(null);
     setResult(null);
 
-    const response = await fetch(endpoint, {
+    const response = await authedFetch(endpoint, {
       method: "POST",
       body: formData,
     });
@@ -228,7 +229,7 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
       formData.append("files", item.file);
     }
 
-    const response = await fetch("/api/import/palms", {
+    const response = await authedFetch("/api/import/palms", {
       method: "POST",
       body: formData,
     });
@@ -281,7 +282,7 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
       formData.append("files", item.file);
     }
 
-    const response = await fetch("/api/import/palms-lifetime", {
+    const response = await authedFetch("/api/import/palms-lifetime", {
       method: "POST",
       body: formData,
     });

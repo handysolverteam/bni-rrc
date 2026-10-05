@@ -1,11 +1,20 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { getServiceSupabase } from "@/lib/supabase/server";
 import { getRenewalCycleUpdateForTaskStatus } from "@/lib/renewals/task-status";
+import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
+import { internalErrorResponse } from "@/lib/api-errors";
 import type { RenewalTask } from "@/lib/types";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
   const body = await request.json();
   const status = body.status;
@@ -22,7 +31,7 @@ export async function PATCH(
     .single();
 
   if (taskError) {
-    return Response.json({ error: taskError.message }, { status: 500 });
+    return internalErrorResponse(taskError, "Unable to load the task.");
   }
 
   const completedAt = new Date();
@@ -35,7 +44,7 @@ export async function PATCH(
     .eq("id", id);
 
   if (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return internalErrorResponse(error, "Unable to update the task.");
   }
 
   const cycleUpdate = getRenewalCycleUpdateForTaskStatus(
@@ -51,9 +60,10 @@ export async function PATCH(
       .eq("id", task.renewal_cycle_id);
 
     if (cycleError) {
-      return Response.json({ error: cycleError.message }, { status: 500 });
+      return internalErrorResponse(cycleError, "Unable to update the renewal cycle.");
     }
   }
 
+  await invalidateCache([CACHE_TAGS.renewals]);
   return Response.json({ ok: true });
 }

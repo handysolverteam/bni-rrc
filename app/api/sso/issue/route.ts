@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { verifyFirebaseIdToken, putSsoExchangeCode } from "@/lib/firebase/admin";
+import { internalErrorResponse } from "@/lib/api-errors";
 
 /**
  * Called by AppShell's `?sso=issue` handling when this app already has an active session, so
@@ -22,9 +23,6 @@ export async function POST(request: Request) {
     await putSsoExchangeCode(code, uid);
     return Response.json({ code });
   } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "Failed to issue SSO code." },
-      { status: 401 },
-    );
+    return internalErrorResponse(error, "Failed to issue SSO code.", 401);
   }
 }

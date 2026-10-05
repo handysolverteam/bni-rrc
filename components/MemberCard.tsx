@@ -38,6 +38,7 @@ export default function MemberCard({ cycle }: { cycle: DashboardCycle }) {
 
   return (
     <Link
+      prefetch
       href={`/members/${cycle.member.id}`}
       className={`focus-ring block min-h-11 rounded-md border border-l-4 border-[var(--line)] bg-white p-3 hover:border-[var(--accent)] ${accentClass}`}
     >

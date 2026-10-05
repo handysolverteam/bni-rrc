@@ -5,11 +5,11 @@ function parseDateOnly(date: string): Date {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
-function toDateOnly(date: Date): string {
+export function toDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function addDays(date: Date, days: number): Date {
+export function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setUTCDate(next.getUTCDate() + days);
   return next;

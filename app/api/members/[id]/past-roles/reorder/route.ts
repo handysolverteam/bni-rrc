@@ -1,10 +1,19 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { buildRoleOrderUpdates } from "@/lib/roles";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
+import { internalErrorResponse } from "@/lib/api-errors";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const rawAssignmentIds = Array.isArray(body?.assignment_ids) ? (body.assignment_ids as unknown[]) : [];
@@ -20,7 +29,7 @@ export async function PATCH(
     .order("display_order", { ascending: true });
 
   if (existingRowsError) {
-    return Response.json({ error: existingRowsError.message }, { status: 500 });
+    return internalErrorResponse(existingRowsError, "Unable to load existing roles.");
   }
 
   if (assignmentIds.length !== (existingRows ?? []).length) {
@@ -43,9 +52,10 @@ export async function PATCH(
       .eq("member_id", id);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return internalErrorResponse(error, "Unable to reorder the roles.");
     }
   }
 
+  await invalidateCache([CACHE_TAGS.members]);
   return Response.json({ ok: true });
 }

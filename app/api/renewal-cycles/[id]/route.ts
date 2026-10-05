@@ -1,5 +1,8 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { buildChecklistUpdates } from "@/lib/renewals/checklist";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
+import { internalErrorResponse } from "@/lib/api-errors";
 
 const editableFields = [
   "status",
@@ -11,6 +14,12 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
   const body = await request.json();
   const supabase = getServiceSupabase();
@@ -28,7 +37,7 @@ export async function PATCH(
     const { error } = await supabase.from("renewal_cycles").update(updates).eq("id", id);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return internalErrorResponse(error, "Unable to save the renewal cycle.");
     }
   }
 
@@ -49,7 +58,8 @@ export async function PATCH(
         );
 
         if (error) {
-          return Response.json({ error: error.message }, { status: 500 });
+          await invalidateCache([CACHE_TAGS.renewals]);
+          return internalErrorResponse(error, "Unable to save the renewal cycle.");
         }
       } else {
         const { error } = await supabase
@@ -59,11 +69,13 @@ export async function PATCH(
           .eq("slot", assignment.slot);
 
         if (error) {
-          return Response.json({ error: error.message }, { status: 500 });
+          await invalidateCache([CACHE_TAGS.renewals]);
+          return internalErrorResponse(error, "Unable to save the renewal cycle.");
         }
       }
     }
   }
 
+  await invalidateCache([CACHE_TAGS.renewals]);
   return Response.json({ ok: true });
 }

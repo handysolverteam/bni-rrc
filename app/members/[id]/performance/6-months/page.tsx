@@ -1,6 +1,6 @@
 import MemberPerformanceRoute from "@/components/MemberPerformanceRoute";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function MemberSixMonthPerformancePage({
   params,

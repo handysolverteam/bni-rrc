@@ -1,10 +1,19 @@
+import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { sanitizeAliasName, normalizeAliasName } from "@/lib/renewals/member-aliases";
 import { getServiceSupabase } from "@/lib/supabase/server";
+import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
+import { internalErrorResponse } from "@/lib/api-errors";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  try {
+    await requireApiAuth(request);
+  } catch {
+    return unauthorizedResponse();
+  }
+
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const aliasName = sanitizeAliasName(typeof body?.alias_name === "string" ? body.alias_name : "");
@@ -31,8 +40,9 @@ export async function POST(
       return Response.json({ error: "That alias is already added for this member." }, { status: 409 });
     }
 
-    return Response.json({ error: error.message }, { status: 500 });
+    return internalErrorResponse(error, "Unable to add the alias.");
   }
 
+  await invalidateCache([CACHE_TAGS.members]);
   return Response.json({ alias: data }, { status: 201 });
 }

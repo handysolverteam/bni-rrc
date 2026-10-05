@@ -71,6 +71,8 @@ function decodeXml(value: string): string {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code: string) => String.fromCharCode(Number.parseInt(code, 16)))
     .replace(/&amp;/g, "&");
 }
 
@@ -121,17 +123,19 @@ function cellsToMap(cells: SpreadsheetCell[]): Map<number, string> {
 }
 
 function normalizeHeader(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function findHeaderIndexes(rows: SpreadsheetCell[][]): Map<string, number> {
+  const wanted = requiredHeaders.map((header) => header.toLowerCase());
   for (const row of rows) {
     const indexes = new Map<string, number>();
 
     for (const cell of row) {
       const header = normalizeHeader(cell.value);
-      if (requiredHeaders.includes(header as (typeof requiredHeaders)[number])) {
-        indexes.set(header, cell.index);
+      const matchIndex = wanted.indexOf(header);
+      if (matchIndex >= 0) {
+        indexes.set(requiredHeaders[matchIndex], cell.index);
       }
     }
 
@@ -144,7 +148,18 @@ function findHeaderIndexes(rows: SpreadsheetCell[][]): Map<string, number> {
 }
 
 function parseNumber(value: string): number {
-  const normalized = value.replace(/,/g, "").trim();
+  // Dashes mean zero/blank in BNI exports; strip currency symbols and
+  // thousands separators before converting.
+  const normalized = value
+    .replace(/,/g, "")
+    .replace(/[₹$]/g, "")
+    .replace(/^\s*rs\.?\s*/i, "")
+    .trim();
+
+  if (!normalized || normalized === "-") {
+    return 0;
+  }
+
   const parsed = Number(normalized);
 
   if (!Number.isFinite(parsed)) {
@@ -165,12 +180,21 @@ function parseOptionalNumber(value: string): number | null {
 }
 
 function parseDateOnly(value: string): string {
-  const isoMatch = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  const trimmed = value.trim();
+  const isoMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
   if (isoMatch) {
     return isoMatch[1];
   }
 
-  const parsed = new Date(value);
+  // BNI India exports use day-first dates ("14-04-2026", "14/04/2026").
+  const dayFirstMatch = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dayFirstMatch) {
+    const day = dayFirstMatch[1].padStart(2, "0");
+    const month = dayFirstMatch[2].padStart(2, "0");
+    return `${dayFirstMatch[3]}-${month}-${day}`;
+  }
+
+  const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) {
     throw new Error(`Invalid date: ${value}`);
   }
@@ -232,7 +256,10 @@ export function matchPalmsRowMembers<T extends { name: string }>(rows: ParsedPal
 }
 
 export function parsePalmsChapterSummaryReport(xml: string): ParsedPalmsReport {
-  if (!xml.includes("<Workbook") || !xml.includes('ss:Name="Report"')) {
+  if (
+    !xml.includes("<Workbook") ||
+    (!xml.includes('ss:Name="Report"') && !xml.includes('Name="Report"'))
+  ) {
     throw new Error("Only SpreadsheetML .xls PALMS reports with a Report worksheet are supported.");
   }
 
@@ -245,7 +272,7 @@ export function parsePalmsChapterSummaryReport(xml: string): ParsedPalmsReport {
     const firstName = cells.get(headerIndexes.get("First Name")!)?.trim() ?? "";
     const lastName = cells.get(headerIndexes.get("Last Name")!)?.trim() ?? "";
 
-    if (!firstName || !lastName || firstName === "First Name") {
+    if (!firstName || !lastName || firstName.toLowerCase() === "first name") {
       continue;
     }
 
