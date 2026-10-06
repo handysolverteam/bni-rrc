@@ -8,16 +8,38 @@ import { useAuth } from "@/context/AuthContext";
 import { firebaseAuth, signOutFirebase } from "@/lib/firebase/client";
 import MobileNav from "@/components/MobileNav";
 import UserMenu from "@/components/UserMenu";
-import { getSsoPartnerUrls } from "@/lib/sso-partners";
+import { getSsoHubUrl, getSsoPartnerUrls, SSO_ATTEMPTED_KEY, clearSsoAttempted } from "@/lib/sso-partners";
 import { isSafeInternalPath, isSafeSsoReturnUrl } from "@/lib/sso-guard";
 
 const PUBLIC_PATHS = ["/login"];
-const SSO_ATTEMPTED_KEY = "bniRrcSsoAttempted";
 
 function Spinner() {
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--line)] border-t-[var(--accent)]" />
+    </div>
+  );
+}
+
+function AccessRequired() {
+  const { user, logout } = useAuth();
+
+  return (
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-sm rounded-lg border border-[var(--line)] bg-[var(--panel)] p-6 text-center shadow-sm sm:p-8">
+        <h1 className="text-lg font-semibold tracking-normal">Access required</h1>
+        <p className="mt-2 text-sm text-[var(--muted)]">
+          {user?.displayName || user?.email || "Your account"} doesn&apos;t have access to this app yet. Ask a
+          Handychapter admin to grant it from the Chapter tab.
+        </p>
+        <button
+          type="button"
+          onClick={() => void logout()}
+          className="focus-ring mt-6 w-full rounded-md border border-[var(--line)] px-3 py-2 text-sm font-medium hover:bg-[#eef1ea]"
+        >
+          Sign out
+        </button>
+      </div>
     </div>
   );
 }
@@ -60,6 +82,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
     if (ssoParam === "logout") {
       ssoHandledRef.current = true;
       window.history.replaceState({}, "", pathname);
+      clearSsoAttempted();
       void signOutFirebase().finally(() => setSsoBusy(false));
       return;
     }
@@ -69,23 +92,18 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
       const code = searchParams.get("ssoCode");
       const rawRedirectPath = searchParams.get("redirect") || "/";
       const redirectPath = isSafeInternalPath(rawRedirectPath) ? rawRedirectPath : "/";
-      const partnerIndex = Number(searchParams.get("partnerIndex") || "0");
       window.history.replaceState({}, "", pathname);
 
-      const tryNextPartner = () => {
-        const partners = getSsoPartnerUrls();
-        const nextIndex = partnerIndex + 1;
-        if (nextIndex < partners.length) {
-          const callback = `${window.location.origin}/?sso=callback&redirect=${encodeURIComponent(redirectPath)}&partnerIndex=${nextIndex}`;
-          window.location.replace(`${partners[nextIndex]}/?sso=issue&return=${encodeURIComponent(callback)}`);
-        } else {
-          router.replace("/login");
-          setSsoBusy(false);
-        }
+      // The hub always either authenticates the user (showing its own login screen if it had
+      // to) or genuinely fails -- there's no partner chain to fall through any more. A missing
+      // code here is unexpected; the local /login page is the safety net.
+      const bail = () => {
+        router.replace("/login");
+        setSsoBusy(false);
       };
 
       if (!code || code === "none") {
-        tryNextPartner();
+        bail();
         return;
       }
 
@@ -98,7 +116,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
           });
 
           if (!response.ok) {
-            tryNextPartner();
+            bail();
             return;
           }
 
@@ -107,7 +125,7 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
           router.replace(redirectPath);
           setSsoBusy(false);
         } catch {
-          tryNextPartner();
+          bail();
         }
       })();
       return;
@@ -167,17 +185,44 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
     }
   }, [ssoParam, isKnownSsoParam, loading, user, pathname, router, searchParams]);
 
+  /**
+   * Authorization (distinct from authentication): being signed in via the hub doesn't mean
+   * this member has been granted access to THIS app. Handychapter admins grant it per member
+   * via the "rrc" committee tag, which sync-committee-tag mirrors into this same Firebase
+   * project as a custom claim of the same name -- checked straight from the ID token, no
+   * cross-database query needed. Force-refreshed once per session so a just-granted/revoked
+   * change doesn't wait for the token's normal ~hour refresh cycle.
+   */
+  const accessCheckedRef = useRef(false);
+  const [accessState, setAccessState] = useState<"checking" | "granted" | "denied">("checking");
+
+  useEffect(() => {
+    if (loading || !user || accessCheckedRef.current) return;
+    accessCheckedRef.current = true;
+
+    (async () => {
+      try {
+        const result = await firebaseAuth.currentUser?.getIdTokenResult(true);
+        setAccessState(result?.claims.rrc === true ? "granted" : "denied");
+      } catch {
+        setAccessState("denied");
+      }
+    })();
+  }, [loading, user]);
+
   useEffect(() => {
     if (ssoBusy || loading || user || isPublicPath) return;
 
-    // Before showing our own login screen, check once per browser session whether any
-    // trusted sibling app already has this user signed in, so a session on one app carries
-    // over to the others without asking them to log in again.
-    const partners = getSsoPartnerUrls();
-    if (partners.length > 0 && !sessionStorage.getItem(SSO_ATTEMPTED_KEY)) {
+    // No local session: defer to the single auth hub (Handychapter) rather than showing our
+    // own login screen. The hub either already has a session (bounces back silently) or shows
+    // its own login form and bounces back once the user completes it -- either way we land
+    // back here authenticated. Once per browser session, so a down/misconfigured hub falls
+    // through to our own /login (kept as a safety net) instead of looping.
+    const hubUrl = getSsoHubUrl();
+    if (hubUrl && !sessionStorage.getItem(SSO_ATTEMPTED_KEY)) {
       sessionStorage.setItem(SSO_ATTEMPTED_KEY, "1");
-      const callback = `${window.location.origin}/?sso=callback&redirect=${encodeURIComponent(pathname)}&partnerIndex=0`;
-      window.location.replace(`${partners[0]}/?sso=issue&return=${encodeURIComponent(callback)}`);
+      const callback = `${window.location.origin}/?sso=callback&redirect=${encodeURIComponent(pathname)}`;
+      window.location.replace(`${hubUrl}/?sso=issue&return=${encodeURIComponent(callback)}`);
       return;
     }
 
@@ -192,8 +237,12 @@ function AppShellContent({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (loading || !user) {
+  if (loading || !user || accessState === "checking") {
     return <Spinner />;
+  }
+
+  if (accessState === "denied") {
+    return <AccessRequired />;
   }
 
   return (
