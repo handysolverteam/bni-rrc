@@ -1,5 +1,5 @@
 import { consumeSsoExchangeCode, mintFirebaseCustomToken } from "@/lib/firebase/admin";
-import { getSsoPartnerUrls } from "@/lib/sso-partners";
+import { getSsoPartnerUrls, getSsoHubUrl } from "@/lib/sso-partners";
 import { internalErrorResponse } from "@/lib/api-errors";
 
 /**
@@ -16,14 +16,22 @@ function isTrustedOrigin(request: Request): boolean {
   const host = request.headers.get("host");
   if (host) {
     try {
-      allowed.add(new URL(`https://${host}`).origin);
+      // The scheme must be derived, not assumed: hardcoding https made every local
+      // (http://localhost) sign-in fail this check, which surfaced as the app falling back to
+      // its own login page instead of completing the handoff. x-forwarded-proto is what Vercel
+      // and other proxies set; request.url covers local dev where there is no proxy.
+      const proto =
+        request.headers.get("x-forwarded-proto")?.split(",")[0].trim() ||
+        new URL(request.url).protocol.replace(":", "");
+      allowed.add(new URL(`${proto}://${host}`).origin);
     } catch {
       // Unparseable Host header; fall through to the partner allowlist.
     }
   }
-  for (const partner of getSsoPartnerUrls()) {
+  for (const candidate of [...getSsoPartnerUrls(), getSsoHubUrl()]) {
+    if (!candidate) continue;
     try {
-      allowed.add(new URL(partner).origin);
+      allowed.add(new URL(candidate).origin);
     } catch {
       // Config noise; skip.
     }
