@@ -83,6 +83,7 @@ export async function POST(request: Request) {
     await invalidateCache([CACHE_TAGS.renewals, CACHE_TAGS.members]);
     return Response.json(result);
   } catch (error) {
+    console.error("[import/traffic-lights] failed:", error);
     return Response.json(
       { error: formatImportError(error) },
       { status: 500 },
