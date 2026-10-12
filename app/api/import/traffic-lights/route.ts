@@ -1,6 +1,5 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { PDFParse } from "pdf-parse";
 import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
 import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
 import {
@@ -18,6 +17,9 @@ import {
 export const runtime = "nodejs";
 
 async function extractPdfText(file: File): Promise<string> {
+  // Loaded lazily: pdfjs needs browser globals (DOMMatrix) at import time, which crashes the
+  // whole route on serverless before an xlsx upload is even handled.
+  const { PDFParse } = await import("pdf-parse");
   const buffer = Buffer.from(await file.arrayBuffer());
   PDFParse.setWorker(
     pathToFileURL(
