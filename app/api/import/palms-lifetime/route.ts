@@ -1,5 +1,6 @@
 import { CACHE_TAGS, invalidateCache } from "@/lib/cache";
-import { importLifetimePalmsChapterSummaryReports } from "@/lib/renewals/palms-database-import";
+import { importLifetimePalmsChapterSummaryReports, previewPalmsChapterSummaryReports } from "@/lib/renewals/palms-database-import";
+import { parseResolutions } from "@/lib/renewals/member-resolution";
 import { requireApiAuth, unauthorizedResponse } from "@/lib/require-api-auth";
 import {
   contentLengthExceedsLimit,
@@ -49,7 +50,13 @@ export async function POST(request: Request) {
         xml: await file.text(),
       })),
     );
-    const result = await importLifetimePalmsChapterSummaryReports(payload);
+
+    // "preview" = dry run (writes nothing); anything else imports, using the user's decisions.
+    if (formData.get("mode") === "preview") {
+      return Response.json({ preview: await previewPalmsChapterSummaryReports(payload, "lifetime") });
+    }
+
+    const result = await importLifetimePalmsChapterSummaryReports(payload, parseResolutions(formData.get("resolutions")));
 
     await invalidateCache([CACHE_TAGS.members, CACHE_TAGS.imports]);
     return Response.json(result);

@@ -1,6 +1,13 @@
 import { getServiceSupabase } from "../supabase/server";
 import type { Member } from "../types";
+import { normalizeImportKey } from "./import";
 import { buildMemberNameResolver, loadMemberAliases } from "./member-aliases";
+import {
+  buildUnmatchedNames,
+  resolveUnmatchedNames,
+  type ImportPreview,
+  type NameResolutions,
+} from "./member-resolution";
 import {
   parseTrafficLightPdfScoreReport,
   parseTrafficLightReport,
@@ -12,8 +19,26 @@ export type TrafficLightImportResult = {
   batchId: string | null;
   importedCount: number;
   skippedCount: number;
+  /** Existing scores for the month that were replaced because the score changed. */
+  overwrittenCount?: number;
+  /** Existing scores for the month that were identical, so left alone. */
+  unchangedCount?: number;
+  createdMembers?: string[];
+  linkedNames?: Array<{ name: string; memberName: string }>;
+  skippedNames?: string[];
   errors: string[];
 };
+
+export type ScoreRowStatus = "new" | "overwrite" | "unchanged";
+
+/** Same member + month already stored: overwrite when the score differs, otherwise leave it. */
+export function classifyScoreRow(
+  existing: { score: number; color: string } | undefined,
+  row: { score: number; color: string },
+): ScoreRowStatus {
+  if (!existing) return "new";
+  return existing.score === row.score && existing.color === row.color ? "unchanged" : "overwrite";
+}
 
 function normalizeReportMonth(value: string | null): string | null {
   if (!value) {
@@ -210,10 +235,108 @@ export async function importTrafficLightReport(
   }
 }
 
+type ScoreRow = ParsedTrafficLightScoreReport["rows"][number];
+
+async function loadExistingScores(
+  reportMonth: string,
+  memberIds: string[],
+): Promise<Map<string, { score: number; color: string }>> {
+  const result = new Map<string, { score: number; color: string }>();
+
+  if (memberIds.length === 0) {
+    return result;
+  }
+
+  const { data, error } = await getServiceSupabase()
+    .from("member_traffic_lights")
+    .select("member_id, score, color")
+    .eq("report_month", reportMonth)
+    .in("member_id", memberIds);
+
+  if (error) {
+    throw error;
+  }
+
+  for (const row of (data ?? []) as Array<{ member_id: string; score: number; color: string }>) {
+    result.set(row.member_id, { score: row.score, color: row.color });
+  }
+
+  return result;
+}
+
+async function loadMembersAndResolver() {
+  const { data, error } = await getServiceSupabase().from("members").select("*");
+
+  if (error) {
+    throw error;
+  }
+
+  const members = (data ?? []) as Member[];
+  const aliases = await loadMemberAliases();
+  return { members, resolve: buildMemberNameResolver(members, aliases) };
+}
+
+/** Dry run: nothing is written. Tells the user what the import would do. */
+export async function previewTrafficLightScoreReport(
+  parsed: ParsedTrafficLightScoreReport,
+  filename: string,
+): Promise<ImportPreview> {
+  const { members, resolve } = await loadMembersAndResolver();
+  const matched: Array<{ member: Member; row: ScoreRow }> = [];
+  const unmatchedNames: string[] = [];
+  let failed = 0;
+
+  for (const row of parsed.rows) {
+    const matches = resolve(row.name);
+
+    if (matches.length === 0) {
+      unmatchedNames.push(row.name);
+    } else if (matches.length > 1) {
+      failed += 1;
+    } else {
+      matched.push({ member: matches[0], row });
+    }
+  }
+
+  const existing = await loadExistingScores(
+    parsed.reportMonth,
+    matched.map((item) => item.member.id),
+  );
+  const counts = { new: 0, overwrite: 0, unchanged: 0 };
+
+  for (const item of matched) {
+    counts[classifyScoreRow(existing.get(item.member.id), item.row)] += 1;
+  }
+
+  return {
+    summary: {
+      toImport: counts.new,
+      toOverwrite: counts.overwrite,
+      unchanged: counts.unchanged,
+      needsDecision: unmatchedNames.length,
+      failed,
+    },
+    files: [
+      {
+        label: filename,
+        detail: `Report month ${parsed.reportMonth.slice(0, 7)}`,
+        toImport: counts.new,
+        toOverwrite: counts.overwrite,
+        unchanged: counts.unchanged,
+        needsDecision: unmatchedNames.length,
+        error: null,
+      },
+    ],
+    unmatched: buildUnmatchedNames(unmatchedNames, members),
+    members: members.map((member) => ({ id: member.id, name: member.name })),
+  };
+}
+
 async function importTrafficLightScoreReport(
   parsed: ParsedTrafficLightScoreReport,
   filename: string,
   sourceType: "traffic_lights_pdf" | "traffic_lights_xlsx",
+  resolutions: NameResolutions = {},
 ): Promise<TrafficLightImportResult> {
   const supabase = getServiceSupabase();
   const errors: string[] = [];
@@ -225,51 +348,76 @@ async function importTrafficLightScoreReport(
   });
 
   let importedCount = 0;
+  let overwrittenCount = 0;
+  let unchangedCount = 0;
   let skippedCount = 0;
 
   try {
-    const resolveMemberName = await loadMemberNameResolver();
-    const matchedRows: Array<{
-      member: Member;
-      row: ParsedTrafficLightScoreReport["rows"][number];
-    }> = [];
+    const { members, resolve } = await loadMembersAndResolver();
+    const matched: Array<{ member: Member; row: ScoreRow }> = [];
+    const unmatched: Array<{ name: string; key: string; row: ScoreRow }> = [];
 
     for (const row of parsed.rows) {
-      const matches = resolveMemberName(row.name);
+      const matches = resolve(row.name);
 
       if (matches.length === 0) {
-        skippedCount += 1;
-        errors.push(`${row.name}: member not found`);
-        continue;
-      }
-
-      if (matches.length > 1) {
+        unmatched.push({ name: row.name, key: normalizeImportKey(row.name), row });
+      } else if (matches.length > 1) {
         skippedCount += 1;
         errors.push(`${row.name}: multiple members matched this name`);
-        continue;
+      } else {
+        matched.push({ member: matches[0], row });
       }
-
-      matchedRows.push({ member: matches[0], row });
     }
 
-    if (matchedRows.length > 0) {
-      const memberIds = matchedRows.map((item) => item.member.id);
-      const { data: existingRows, error: existingRowsError } = await supabase
-        .from("member_traffic_lights")
-        .select("member_id")
-        .eq("report_month", parsed.reportMonth)
-        .in("member_id", memberIds);
+    // Apply the user's create / link / skip decisions for names with no match.
+    const outcome = await resolveUnmatchedNames(
+      [...new Map(unmatched.map((item) => [item.key, { key: item.key, name: item.name }])).values()],
+      resolutions,
+      members,
+    );
+    errors.push(...outcome.errors);
 
-      if (existingRowsError) {
-        throw existingRowsError;
+    for (const item of unmatched) {
+      const member = outcome.resolved.get(item.key);
+
+      if (member) {
+        matched.push({ member, row: item.row });
+      } else {
+        skippedCount += 1;
+      }
+    }
+
+    // One score per member per month: keep the first row if a file lists the same member twice.
+    const seen = new Set<string>();
+    const unique = matched.filter((item) => {
+      if (seen.has(item.member.id)) {
+        skippedCount += 1;
+        errors.push(`${item.row.name}: duplicate row for ${item.member.name} in this file`);
+        return false;
       }
 
-      const existingMemberIds = new Set(
-        ((existingRows ?? []) as Array<{ member_id: string }>).map((row) => row.member_id),
-      );
-      const inserts = matchedRows
-        .filter((item) => !existingMemberIds.has(item.member.id))
-        .map((item) => ({
+      seen.add(item.member.id);
+      return true;
+    });
+
+    const existing = await loadExistingScores(
+      parsed.reportMonth,
+      unique.map((item) => item.member.id),
+    );
+    const inserts = [];
+    const overwrites = [];
+
+    for (const item of unique) {
+      const status = classifyScoreRow(existing.get(item.member.id), item.row);
+
+      if (status === "unchanged") {
+        unchangedCount += 1;
+        skippedCount += 1;
+      } else if (status === "overwrite") {
+        overwrites.push(item);
+      } else {
+        inserts.push({
           member_id: item.member.id,
           report_month: parsed.reportMonth,
           report_window_start: parsed.reportWindowStart,
@@ -289,45 +437,46 @@ async function importTrafficLightScoreReport(
           trainings: 0,
           week_count: 0,
           import_batch_id: batch.id,
-        }));
-
-      if (inserts.length > 0) {
-        const { error } = await supabase.from("member_traffic_lights").insert(inserts);
-
-        if (error) {
-          skippedCount += inserts.length;
-          errors.push(formatImportError(error));
-        } else {
-          importedCount += inserts.length;
-        }
+        });
       }
+    }
 
-      for (const item of matchedRows.filter((row) => existingMemberIds.has(row.member.id))) {
-        const { error } = await supabase
-          .from("member_traffic_lights")
-          .update({
-            report_window_start: parsed.reportWindowStart,
-            report_window_end: parsed.reportWindowEnd,
-            score: item.row.score,
-            color: item.row.color,
-            import_batch_id: batch.id,
-          })
-          .eq("member_id", item.member.id)
-          .eq("report_month", parsed.reportMonth);
+    if (inserts.length > 0) {
+      const { error } = await supabase.from("member_traffic_lights").insert(inserts);
 
-        if (error) {
-          skippedCount += 1;
-          errors.push(`${item.row.name}: ${formatImportError(error)}`);
-        } else {
-          importedCount += 1;
-        }
+      if (error) {
+        skippedCount += inserts.length;
+        errors.push(formatImportError(error));
+      } else {
+        importedCount = inserts.length;
+      }
+    }
+
+    for (const item of overwrites) {
+      const { error } = await supabase
+        .from("member_traffic_lights")
+        .update({
+          report_window_start: parsed.reportWindowStart,
+          report_window_end: parsed.reportWindowEnd,
+          score: item.row.score,
+          color: item.row.color,
+          import_batch_id: batch.id,
+        })
+        .eq("member_id", item.member.id)
+        .eq("report_month", parsed.reportMonth);
+
+      if (error) {
+        skippedCount += 1;
+        errors.push(`${item.row.name}: ${formatImportError(error)}`);
+      } else {
+        overwrittenCount += 1;
       }
     }
 
     await supabase
       .from("import_batches")
       .update({
-        imported_count: importedCount,
+        imported_count: importedCount + overwrittenCount,
         skipped_count: skippedCount,
         status: errors.length > 0 ? "failed" : "completed",
         error_message: errors.length > 0 ? errors.join("\n") : null,
@@ -339,6 +488,11 @@ async function importTrafficLightScoreReport(
       batchId: batch.id,
       importedCount,
       skippedCount,
+      overwrittenCount,
+      unchangedCount,
+      createdMembers: outcome.createdMembers,
+      linkedNames: outcome.linkedNames,
+      skippedNames: outcome.skippedNames,
       errors,
     };
   } catch (error) {
@@ -359,16 +513,36 @@ export async function importTrafficLightPdfScoreReport(
   text: string,
   filename: string,
   reportMonthOverride?: string | null,
+  resolutions: NameResolutions = {},
 ): Promise<TrafficLightImportResult> {
   const parsed = parseTrafficLightPdfScoreReport(text, normalizeReportMonth(reportMonthOverride ?? null));
-  return importTrafficLightScoreReport(parsed, filename, "traffic_lights_pdf");
+  return importTrafficLightScoreReport(parsed, filename, "traffic_lights_pdf", resolutions);
+}
+
+export async function previewTrafficLightPdfScoreReport(
+  text: string,
+  filename: string,
+  reportMonthOverride?: string | null,
+): Promise<ImportPreview> {
+  const parsed = parseTrafficLightPdfScoreReport(text, normalizeReportMonth(reportMonthOverride ?? null));
+  return previewTrafficLightScoreReport(parsed, filename);
 }
 
 export async function importTrafficLightXlsxReport(
   buffer: Buffer,
   filename: string,
   reportMonthOverride?: string | null,
+  resolutions: NameResolutions = {},
 ): Promise<TrafficLightImportResult> {
   const parsed = parseTrafficLightXlsxReport(buffer, normalizeReportMonth(reportMonthOverride ?? null));
-  return importTrafficLightScoreReport(parsed, filename, "traffic_lights_xlsx");
+  return importTrafficLightScoreReport(parsed, filename, "traffic_lights_xlsx", resolutions);
+}
+
+export async function previewTrafficLightXlsxReport(
+  buffer: Buffer,
+  filename: string,
+  reportMonthOverride?: string | null,
+): Promise<ImportPreview> {
+  const parsed = parseTrafficLightXlsxReport(buffer, normalizeReportMonth(reportMonthOverride ?? null));
+  return previewTrafficLightScoreReport(parsed, filename);
 }

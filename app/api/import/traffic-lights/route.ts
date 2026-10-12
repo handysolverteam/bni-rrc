@@ -12,7 +12,10 @@ import {
   importTrafficLightPdfScoreReport,
   importTrafficLightReport,
   importTrafficLightXlsxReport,
+  previewTrafficLightPdfScoreReport,
+  previewTrafficLightXlsxReport,
 } from "@/lib/renewals/traffic-light-import";
+import { parseResolutions } from "@/lib/renewals/member-resolution";
 
 export const runtime = "nodejs";
 
@@ -67,19 +70,43 @@ export async function POST(request: Request) {
     }
 
     const normalizedReportMonth = typeof reportMonth === "string" && reportMonth ? reportMonth : null;
+    // "preview" = dry run (writes nothing); anything else imports, using the user's decisions.
+    const isPreview = formData.get("mode") === "preview";
+    const resolutions = parseResolutions(formData.get("resolutions"));
+
     if (filename.endsWith(".xlsx")) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+
+      if (isPreview) {
+        return Response.json({
+          preview: await previewTrafficLightXlsxReport(buffer, file.name, normalizedReportMonth),
+        });
+      }
+
       const result = await importTrafficLightXlsxReport(
-        Buffer.from(await file.arrayBuffer()),
+        buffer,
         file.name,
         normalizedReportMonth,
+        resolutions,
       );
       await invalidateCache([CACHE_TAGS.renewals, CACHE_TAGS.members]);
       return Response.json(result);
     }
 
     const text = await extractPdfText(file);
-    const result = text.includes("Chapter Name Total Score")
-      ? await importTrafficLightPdfScoreReport(text, file.name, normalizedReportMonth)
+    const isScoreReport = text.includes("Chapter Name Total Score");
+
+    if (isPreview) {
+      // The detailed (non-score) PDF format has no review step; the client imports it directly.
+      return Response.json({
+        preview: isScoreReport
+          ? await previewTrafficLightPdfScoreReport(text, file.name, normalizedReportMonth)
+          : null,
+      });
+    }
+
+    const result = isScoreReport
+      ? await importTrafficLightPdfScoreReport(text, file.name, normalizedReportMonth, resolutions)
       : await importTrafficLightReport(text, file.name, normalizedReportMonth);
 
     await invalidateCache([CACHE_TAGS.renewals, CACHE_TAGS.members]);

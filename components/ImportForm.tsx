@@ -6,13 +6,29 @@ import { useRouter } from "next/navigation";
 import { authedFetch } from "@/lib/auth-token";
 import { formatDisplayDate, formatDisplayMonth } from "@/lib/date-format";
 import type { PalmsMonthlyCoverage } from "@/lib/renewals/import-coverage";
+import ImportReviewPanel from "@/components/ImportReviewPanel";
+import type { ImportPreview, NameResolutions } from "@/lib/renewals/member-resolution";
 import { parsePalmsChapterSummaryReport } from "@/lib/renewals/palms-import";
 import { isExactMonthlyPalmsWindow } from "@/lib/renewals/palms-monthly-performance";
 
 type ImportResult = {
   importedCount: number;
   skippedCount: number;
+  overwrittenCount?: number;
+  unchangedCount?: number;
+  createdMembers?: string[];
+  linkedNames?: Array<{ name: string; memberName: string }>;
+  skippedNames?: string[];
   errors: string[];
+};
+
+type ReviewKind = "traffic" | "palms" | "lifetime";
+
+type ReviewState = {
+  kind: ReviewKind;
+  preview: ImportPreview;
+  confirm: (resolutions: NameResolutions) => Promise<void>;
+  cancel: () => void;
 };
 
 type PalmsBatchResult = ImportResult & {
@@ -57,6 +73,7 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
   const [duesSubmitting, setDuesSubmitting] = useState(false);
   const [duesResult, setDuesResult] = useState<ImportResult | null>(null);
   const [duesError, setDuesError] = useState<string | null>(null);
+  const [review, setReview] = useState<ReviewState | null>(null);
   const [trafficSubmitting, setTrafficSubmitting] = useState(false);
   const [trafficResult, setTrafficResult] = useState<ImportResult | null>(null);
   const [trafficError, setTrafficError] = useState<string | null>(null);
@@ -101,6 +118,99 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
 
     setResult(payload);
     form.reset();
+  }
+
+  /**
+   * Two-step import used by traffic lights and PALMS: ask the server what the file would do
+   * (nothing is written), let the user review it and decide on unknown names, then import.
+   */
+  async function reviewedImport({
+    kind,
+    endpoint,
+    formData,
+    setSubmitting,
+    setError,
+    setResult,
+    onDone,
+  }: {
+    kind: ReviewKind;
+    endpoint: string;
+    formData: FormData;
+    setSubmitting: (value: boolean) => void;
+    setError: (value: string | null) => void;
+    setResult: (value: never) => void;
+    onDone: () => void;
+  }) {
+    const post = async (mode: "preview" | "commit", resolutions?: NameResolutions) => {
+      formData.set("mode", mode);
+
+      if (resolutions) {
+        formData.set("resolutions", JSON.stringify(resolutions));
+      }
+
+      const response = await authedFetch(endpoint, { method: "POST", body: formData });
+      const payload = await response.json().catch(() => ({}));
+      return { response, payload };
+    };
+
+    const commit = async (resolutions: NameResolutions) => {
+      const { response, payload } = await post("commit", resolutions);
+      setReview(null);
+      setSubmitting(false);
+
+      if (!response.ok) {
+        setError(payload.error ?? "Import failed");
+        return;
+      }
+
+      setResult(payload as never);
+      onDone();
+    };
+
+    setReview(null);
+    const { response, payload } = await post("preview");
+
+    if (!response.ok) {
+      setSubmitting(false);
+      setError(payload.error ?? "Import failed");
+      return;
+    }
+
+    // Formats without a review step (detailed traffic-light PDF) import straight away.
+    if (!payload.preview) {
+      await commit({});
+      return;
+    }
+
+    setSubmitting(false);
+    setReview({
+      kind,
+      preview: payload.preview as ImportPreview,
+      confirm: commit,
+      cancel: () => setReview(null),
+    });
+  }
+
+  async function submitTrafficImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+
+    setTrafficSubmitting(true);
+    setTrafficError(null);
+    setTrafficResult(null);
+
+    await reviewedImport({
+      kind: "traffic",
+      endpoint: "/api/import/traffic-lights",
+      formData: new FormData(form),
+      setSubmitting: setTrafficSubmitting,
+      setError: setTrafficError,
+      setResult: setTrafficResult as (value: never) => void,
+      onDone: () => {
+        form.reset();
+        router.refresh();
+      },
+    });
   }
 
   async function queuePalmsFiles(files: FileList | File[]) {
@@ -229,26 +339,22 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
       formData.append("files", item.file);
     }
 
-    const response = await authedFetch("/api/import/palms", {
-      method: "POST",
-      body: formData,
+    await reviewedImport({
+      kind: "palms",
+      endpoint: "/api/import/palms",
+      formData,
+      setSubmitting: setPalmsSubmitting,
+      setError: setPalmsError,
+      setResult: setPalmsResult as (value: never) => void,
+      onDone: () => {
+        setQueuedPalmsFiles([]);
+        router.refresh();
+
+        if (palmsInputRef.current) {
+          palmsInputRef.current.value = "";
+        }
+      },
     });
-    const payload = await response.json();
-
-    setPalmsSubmitting(false);
-
-    if (!response.ok) {
-      setPalmsError(payload.error ?? "Import failed");
-      return;
-    }
-
-    setPalmsResult(payload);
-    setQueuedPalmsFiles([]);
-    router.refresh();
-
-    if (palmsInputRef.current) {
-      palmsInputRef.current.value = "";
-    }
   }
 
   async function handlePalmsDrop(event: DragEvent<HTMLLabelElement>) {
@@ -282,26 +388,22 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
       formData.append("files", item.file);
     }
 
-    const response = await authedFetch("/api/import/palms-lifetime", {
-      method: "POST",
-      body: formData,
+    await reviewedImport({
+      kind: "lifetime",
+      endpoint: "/api/import/palms-lifetime",
+      formData,
+      setSubmitting: setLifetimePalmsSubmitting,
+      setError: setLifetimePalmsError,
+      setResult: setLifetimePalmsResult as (value: never) => void,
+      onDone: () => {
+        setQueuedLifetimePalmsFiles([]);
+        router.refresh();
+
+        if (lifetimePalmsInputRef.current) {
+          lifetimePalmsInputRef.current.value = "";
+        }
+      },
     });
-    const payload = await response.json();
-
-    setLifetimePalmsSubmitting(false);
-
-    if (!response.ok) {
-      setLifetimePalmsError(payload.error ?? "Import failed");
-      return;
-    }
-
-    setLifetimePalmsResult(payload);
-    setQueuedLifetimePalmsFiles([]);
-    router.refresh();
-
-    if (lifetimePalmsInputRef.current) {
-      lifetimePalmsInputRef.current.value = "";
-    }
   }
 
   async function handleLifetimePalmsDrop(event: DragEvent<HTMLLabelElement>) {
@@ -390,6 +492,9 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
           {lifetimePalmsSubmitting ? "Importing..." : "Import lifetime PALMS summary"}
         </button>
 
+        {review?.kind === "lifetime" ? (
+          <ImportReviewPanel preview={review.preview} onConfirm={review.confirm} onCancel={review.cancel} />
+        ) : null}
         <PalmsImportFeedback result={lifetimePalmsResult} error={lifetimePalmsError} />
       </form>
 
@@ -468,6 +573,9 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
           {palmsSubmitting ? "Importing..." : "Import PALMS summaries"}
         </button>
 
+        {review?.kind === "palms" ? (
+          <ImportReviewPanel preview={review.preview} onConfirm={review.confirm} onCancel={review.cancel} />
+        ) : null}
         <PalmsImportFeedback result={palmsResult} error={palmsError} />
       </form>
 
@@ -587,15 +695,7 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
       </form>
 
       <form
-        onSubmit={(event) =>
-          submitImport(
-            event,
-            "/api/import/traffic-lights",
-            setTrafficSubmitting,
-            setTrafficResult,
-            setTrafficError,
-          )
-        }
+        onSubmit={submitTrafficImport}
         className="space-y-4 rounded-md border border-[var(--line)] bg-white p-4"
       >
         <div>
@@ -627,8 +727,12 @@ export default function ImportForm({ coverage }: { coverage: PalmsMonthlyCoverag
           disabled={trafficSubmitting}
           type="submit"
         >
-          {trafficSubmitting ? "Importing..." : "Import traffic lights"}
+          {trafficSubmitting ? "Checking file..." : "Import traffic lights"}
         </button>
+
+        {review?.kind === "traffic" ? (
+          <ImportReviewPanel preview={review.preview} onConfirm={review.confirm} onCancel={review.cancel} />
+        ) : null}
 
         <ImportFeedback result={trafficResult} error={trafficError} />
       </form>
@@ -710,6 +814,40 @@ function PalmsCoverageSection({ coverage }: { coverage: PalmsMonthlyCoverage }) 
   );
 }
 
+function ImportOutcomeDetails({ result }: { result: ImportResult }) {
+  return (
+    <>
+      {result.overwrittenCount ? <p>Overwritten (changed): {result.overwrittenCount}</p> : null}
+      {result.unchangedCount ? <p>Already imported (skipped): {result.unchangedCount}</p> : null}
+      {result.createdMembers && result.createdMembers.length > 0 ? (
+        <div className="mt-2">
+          <p>New members created: {result.createdMembers.length}</p>
+          <ul className="list-disc pl-5">
+            {result.createdMembers.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {result.linkedNames && result.linkedNames.length > 0 ? (
+        <div className="mt-2">
+          <p>Linked to existing members (saved as aliases):</p>
+          <ul className="list-disc pl-5">
+            {result.linkedNames.map((item) => (
+              <li key={item.name}>
+                {item.name} → {item.memberName}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {result.skippedNames && result.skippedNames.length > 0 ? (
+        <p className="mt-2">Skipped by choice: {result.skippedNames.join(", ")}</p>
+      ) : null}
+    </>
+  );
+}
+
 function ImportFeedback({ result, error }: { result: ImportResult | null; error: string | null }) {
   return (
     <>
@@ -718,6 +856,7 @@ function ImportFeedback({ result, error }: { result: ImportResult | null; error:
           <p className="font-semibold">Import complete</p>
           <p>Imported: {result.importedCount}</p>
           <p>Skipped: {result.skippedCount}</p>
+          <ImportOutcomeDetails result={result} />
           {result.errors.length > 0 ? (
             <ul className="mt-2 list-disc pl-5 text-[var(--danger)]">
               {result.errors.map((item) => (
@@ -755,6 +894,7 @@ function PalmsImportFeedback({
           <p>Failed files: {result.failedFiles}</p>
           <p>Imported rows: {result.importedCount}</p>
           <p>Skipped rows: {result.skippedCount}</p>
+          <ImportOutcomeDetails result={result} />
           <ul className="mt-3 space-y-2">
             {result.files.map((file) => (
               <li key={`${file.filename}-${file.reportIdentity ?? file.status}`} className="rounded-md border border-[var(--line)] bg-white p-3">
